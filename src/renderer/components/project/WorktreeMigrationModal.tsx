@@ -50,10 +50,25 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
   const [phase, setPhase] = useState<Phase>({ kind: 'confirm' });
   const [dontAsk, setDontAsk] = useState(false);
   const [results, setResults] = useState<WorktreeMigrationResult[]>([]);
+  // Projects ticked for this run; the rest are offered again next launch.
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(plan.map((p) => p.projectId)),
+  );
 
   const taskCount = plan.reduce((n, p) => n + p.tasks.length, 0);
+  const chosen = plan.filter((p) => selected.has(p.projectId));
+  const chosenTaskCount = chosen.reduce((n, p) => n + p.tasks.length, 0);
   const movedCount = results.reduce((n, r) => n + r.moved.length, 0);
   const failures = results.flatMap((r) => r.failed);
+
+  function toggleProject(projectId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
 
   function handleLater() {
     if (dontAsk) setWorktreeMigrationDismissed();
@@ -63,7 +78,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
   async function handleMove() {
     setPhase({ kind: 'running', done: 0 });
     const collected: WorktreeMigrationResult[] = [];
-    for (const project of plan) {
+    for (const project of chosen) {
       const resp = await window.electronAPI.worktreeMigrate({ projectId: project.projectId });
       collected.push(
         resp.success && resp.data
@@ -111,17 +126,27 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
               , where Claude Code expects it. {taskCount} worktree{taskCount === 1 ? '' : 's'} in{' '}
               {plan.length} project{plan.length === 1 ? '' : 's'} still{' '}
               {taskCount === 1 ? 'lives' : 'live'} at the old location. Moving keeps every branch,
-              file and setting; running task terminals restart afterwards.
+              file and setting; running task terminals restart afterwards. Untick a project to leave
+              it for a later launch.
             </p>
 
             <div className="space-y-3">
               {plan.map((project) => (
                 <div
                   key={project.projectId}
-                  className="rounded-xl border border-border/40 p-3.5"
+                  className={`rounded-xl border border-border/40 p-3.5 transition-opacity ${
+                    selected.has(project.projectId) ? '' : 'opacity-50'
+                  }`}
                   style={{ background: 'hsl(var(--surface-2))' }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <label className="flex items-center gap-2 min-w-0 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(project.projectId)}
+                      disabled={busy}
+                      onChange={() => toggleProject(project.projectId)}
+                      className="accent-primary"
+                    />
                     <FolderGit2 size={13} strokeWidth={1.8} className="text-muted-foreground" />
                     <span className="text-[12.5px] font-medium text-foreground truncate">
                       {project.projectName}
@@ -129,7 +154,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                     <span className="text-[11px] text-muted-foreground/70 ml-auto shrink-0">
                       {project.tasks.length} task{project.tasks.length === 1 ? '' : 's'}
                     </span>
-                  </div>
+                  </label>
                   <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-[10.5px] font-mono text-foreground/50">
                     <dt className="text-muted-foreground/60 select-none">from</dt>
                     <dd className="break-all">{project.legacyDir}</dd>
@@ -176,7 +201,13 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
               </div>
               <div className="min-w-0">
                 <p className="text-[12.5px] font-medium text-foreground">
-                  Moved {movedCount} of {taskCount} worktree{taskCount === 1 ? '' : 's'}
+                  Moved {movedCount} of {chosenTaskCount} worktree
+                  {chosenTaskCount === 1 ? '' : 's'}
+                  {chosen.length < plan.length
+                    ? ` (${plan.length - chosen.length} project${
+                        plan.length - chosen.length === 1 ? '' : 's'
+                      } left for next launch)`
+                    : ''}
                 </p>
                 {failures.length > 0 && (
                   <p className="text-[11.5px] text-muted-foreground mt-0.5">
@@ -239,14 +270,16 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
               <button
                 type="button"
                 onClick={() => void handleMove()}
-                disabled={busy}
+                disabled={busy || chosen.length === 0}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium bg-primary text-primary-foreground hover:brightness-110 transition-all duration-150 disabled:opacity-70 disabled:pointer-events-none"
               >
                 {busy ? (
                   <>
                     <Loader2 size={13} strokeWidth={2} className="animate-spin" />
-                    Moving {phase.kind === 'running' ? phase.done : 0}/{plan.length}…
+                    Moving {phase.kind === 'running' ? phase.done : 0}/{chosen.length}…
                   </>
+                ) : chosen.length < plan.length ? (
+                  `Move ${chosen.length} of ${plan.length}`
                 ) : (
                   'Move now'
                 )}

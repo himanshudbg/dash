@@ -113,7 +113,10 @@ PR 1:
   `git status` in the main checkout clean.
 - Legacy-layout task → "Move task worktrees" dialog after tasks load; Later
   re-asks after reload; Move now moves the worktree, records `previous_path`,
-  removes the empty legacy dir, shows "Moved 1 of 1". Done twice.
+  removes the empty legacy dir, shows "Moved 1 of 1". Done twice. The dialog
+  since gained full from/to paths and a checkbox per project (unticked
+  projects are offered again next launch) so the owner can move one project
+  at a time on real data.
 - Version floor (floor temporarily set to 9.9.9): gate panel replaces the
   pane with both versions, `claude update` and "Check again"; git, ports and
   shell panels keep working; Settings Claude card says "needs an update".
