@@ -66,6 +66,13 @@ export const tasks = sqliteTable(
     // Null for tasks created at the current location or never moved. Read by
     // session resume + token aggregation, which look in both transcript dirs.
     previousPath: text('previous_path'),
+    // Claude Code supervisor job for the task's session (0.16): the short job
+    // id from `claude agents --json`, the session UUID for `--bg --resume`, and
+    // when the session was last stopped (archive / idle stop). Null until the
+    // task's first dispatch.
+    jobId: text('job_id'),
+    sessionId: text('session_id'),
+    sessionStoppedAt: text('session_stopped_at'),
     archivedAt: text('archived_at'),
     sortOrder: integer('sort_order').notNull().default(0),
     totalTokens: integer('total_tokens').notNull().default(0),

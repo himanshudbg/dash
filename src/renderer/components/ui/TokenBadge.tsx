@@ -15,7 +15,12 @@ export function TokenBadge({ totalTokens, totalCostUsd, size = 'md' }: TokenBadg
   const sizeCls =
     size === 'sm' ? 'gap-1 px-1.5 py-0.5 text-[10px]' : 'gap-1.5 px-2 py-[3px] text-[11px]';
   return (
-    <Tooltip content={`${totalTokens.toLocaleString()} tokens`}>
+    // Claude Code's supervisor writes per-session summaries and auto names with
+    // a separate model call outside the transcript; Dash counts transcripts
+    // only, so those calls are billed but never appear here.
+    <Tooltip
+      content={`${totalTokens.toLocaleString()} tokens from the session transcripts (Claude Code's session summaries are billed separately and not counted)`}
+    >
       <span
         className={`inline-flex items-center rounded-full bg-foreground/5 text-muted-foreground font-mono tabular-nums ${sizeCls}`}
       >

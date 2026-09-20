@@ -9,7 +9,7 @@ import {
   ensureWatching as ensurePortsConfigWatch,
   stop as stopPortsConfigWatch,
 } from '../services/PortsConfigWatcher';
-import { discardInitialPrompt } from '../services/ptyManager';
+import { discardInitialPrompt, stopTaskSession, removeTaskSession } from '../services/ptyManager';
 import { getTuiHost } from '../tui/hostInstance';
 
 export function registerDbIpc(): void {
@@ -88,9 +88,14 @@ export function registerDbIpc(): void {
     }
   });
 
-  ipcMain.handle('db:deleteTask', (_event, id: string) => {
+  ipcMain.handle('db:deleteTask', async (_event, id: string) => {
     try {
       parseArgs('db:deleteTask', z.string(), id);
+      // Forget the task's supervisor session first (transcript kept), while
+      // the row still carries the job id.
+      await removeTaskSession(id).catch((err) =>
+        console.warn('[db:deleteTask] session removal failed:', err),
+      );
       DatabaseService.deleteTask(id);
       // The worktree is gone (or about to be) — close the ports watcher,
       // drop any never-consumed initial prompt, and dismiss a lingering
@@ -126,9 +131,14 @@ export function registerDbIpc(): void {
     },
   );
 
-  ipcMain.handle('db:archiveTask', (_event, id: string) => {
+  ipcMain.handle('db:archiveTask', async (_event, id: string) => {
     try {
       parseArgs('db:archiveTask', z.string(), id);
+      // An archived task's session sleeps (`claude stop`); restoring and
+      // opening the task attaches, which wakes it.
+      await stopTaskSession(id).catch((err) =>
+        console.warn('[db:archiveTask] session stop failed:', err),
+      );
       DatabaseService.archiveTask(id);
       TelemetryService.capture('task_archived');
       return { success: true };

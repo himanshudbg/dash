@@ -539,6 +539,8 @@ function ClaudeCodeTab({ claudeInfo }: { claudeInfo: ClaudeCliInfo | null }) {
   const onSyncShellEnvChange = useSettings((s) => s.setSyncShellEnv);
   const ultracode = useSettings((s) => s.ultracode);
   const onUltracodeChange = useSettings((s) => s.setUltracode);
+  const stopSessionsOnQuit = useSettings((s) => s.stopSessionsOnQuit);
+  const onStopSessionsOnQuitChange = useSettings((s) => s.setStopSessionsOnQuit);
   const customEnvVars = useSettings((s) => s.customClaudeEnvVars);
   const onCustomEnvVarsChange = useSettings((s) => s.setCustomClaudeEnvVars);
   const [newKey, setNewKey] = useState('');
@@ -646,8 +648,17 @@ function ClaudeCodeTab({ claudeInfo }: { claudeInfo: ClaudeCliInfo | null }) {
         />
         <SettingsRow
           label="Ultracode"
-          description="Launch new sessions with X-High reasoning and multi-agent workflow orchestration (via --settings). Uses more tokens and runs slower; not a saved effort level, so the buttons above don't control it."
+          description="Launch new sessions with X-High reasoning and multi-agent workflow orchestration (via --settings). Uses more tokens and runs slower; not a saved effort level, so the buttons above don't control it. Takes effect when a task session is next started or restarted."
           control={<Switch enabled={ultracode} onToggle={onUltracodeChange} />}
+        />
+        <SettingsRow
+          label="Stop sessions on quit"
+          description={
+            stopSessionsOnQuit
+              ? 'Quitting Dash stops every task session (claude stop). Opening a task starts it again from its transcript.'
+              : 'Task sessions keep running under Claude Code after Dash quits and are picked up again on the next launch. Idle sessions are parked by Claude Code after about an hour.'
+          }
+          control={<Switch enabled={stopSessionsOnQuit} onToggle={onStopSessionsOnQuitChange} />}
         />
       </SettingsCard>
 

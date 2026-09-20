@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BrowserWindow } from 'electron';
-import { hookServer } from './HookServer';
+import { hookServer, getHookPortFilePath } from './HookServer';
 import { RtkService } from './RtkService';
 import { DatabaseService } from './DatabaseService';
 import {
@@ -154,16 +154,19 @@ export function writeHookSettings(cwd: string, ptyId: string): HookWriteResult {
   }
 
   // Hooks post to the HookServer via a guarded curl command, NOT a baked
-  // `type: "http"` URL. Two reasons, both about the URL no longer hard-coding
-  // the port:
-  //   1. The port is read at runtime from $DASH_HOOK_PORT, which ptyManager
-  //      injects into the env of the Claude process Dash spawns. A session NOT
-  //      launched by Dash (the user opening the same worktree in a plain
-  //      `claude`) has no such var, so the `[ -n … ] || exit 0` guard makes
-  //      every hook a silent no-op instead of an ECONNREFUSED error.
-  //   2. Even inside Dash, the HookServer binds a fresh ephemeral port each
-  //      launch — reading it live means a stale settings.local.json from a
-  //      prior session self-heals instead of firing at a dead port.
+  // `type: "http"` URL. The port is read at runtime from a file Dash writes
+  // while it runs (HookServer.getHookPortFilePath), for three reasons:
+  //   1. The HookServer binds a fresh ephemeral port each launch, while the
+  //      task session lives on under Claude Code's supervisor — and the
+  //      supervisor freezes the dispatch-time environment into the job and
+  //      reuses it on every respawn, so a port in the env would go stale on
+  //      the first Dash restart.
+  //   2. A session running while Dash is closed (or one the user launched
+  //      outside Dash in the same worktree) finds no file, and the
+  //      `|| exit 0` guards make every hook a silent no-op instead of an
+  //      ECONNREFUSED error.
+  //   3. The file lives under userData, so a second Dash with its own data
+  //      directory never receives another instance's hooks.
   // The hook payload arrives on the command's stdin; `-d @-` forwards it as the
   // POST body, matching what the old http hook sent.
   //
@@ -172,13 +175,12 @@ export function writeHookSettings(cwd: string, ptyId: string): HookWriteResult {
   // PowerShell on Windows. Dash ships macOS arm64 + Linux x64 only, so this
   // syntax targets `sh` and is NOT given a win32 branch — unlike the
   // context-injection hook below, whose base64 decode genuinely differs by OS.
-  // The `$DASH_HOOK_PORT` guard, not Windows support, is the reason it's a
-  // command rather than the old `type:"http"` hook.
+  const portFile = getHookPortFilePath().replace(/"/g, '\\"');
   const hookCommand = (endpoint: DashHookEndpoint): string => {
-    const url = `http://127.0.0.1:$DASH_HOOK_PORT/hook/${endpoint}?ptyId=${ptyId}`;
+    const url = `http://127.0.0.1:$P/hook/${endpoint}?ptyId=${ptyId}`;
     return (
-      `[ -n "$DASH_HOOK_PORT" ] || exit 0; ` +
-      `curl -s --max-time 2 -X POST -H 'Content-Type: application/json' -d @- "${url}" >/dev/null 2>&1`
+      `P=$(cat "${portFile}" 2>/dev/null) || exit 0; [ -n "$P" ] || exit 0; ` +
+      `curl -s --max-time 2 -X POST -H 'Content-Type: application/json' -d @- "${url}" >/dev/null 2>&1; exit 0`
     );
   };
 

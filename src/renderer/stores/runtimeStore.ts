@@ -6,6 +6,7 @@ import type {
   RemoteControlState,
   RtkStatus,
   RtkDownloadProgress,
+  SupervisorSession,
   Task,
 } from '../../shared/types';
 import { playNotificationSound, playPeonSound } from '../sounds';
@@ -30,12 +31,22 @@ export interface RuntimeState {
   /** Startup `claude --version` probe; null until it answers. MainContent gates
    *  the task terminal on `supported`. */
   claudeCli: ClaudeCliInfo | null;
+  /** Every session under Claude Code's supervisor (`claude agents --json --all`),
+   *  refreshed by main's reconcile loop. Task-owned rows are matched by
+   *  `Task.jobId`; the rest are "foreign" and listed per project. */
+  supervisorSessions: SupervisorSession[];
 }
 
 export interface RuntimeActions {
   refreshTokenRollups: () => Promise<void>;
   /** Re-read the CLI probe; `refresh` re-runs `claude --version` in main. */
   refreshClaudeCli: (opts?: { refresh?: boolean }) => Promise<void>;
+  /** Ask main for a fresh supervisor listing. */
+  refreshSessions: () => Promise<void>;
+  stopSession: (jobId: string) => Promise<void>;
+  removeSession: (jobId: string) => Promise<void>;
+  /** Turn a foreign session into a task under `projectId`; resolves with the task. */
+  adoptSession: (projectId: string, jobId: string) => Promise<Task | null>;
   enableRtk: (enabled: boolean) => Promise<void>;
   downloadRtk: () => Promise<void>;
   /** Wire every live IPC subscription; returns a combined cleanup. */
@@ -52,11 +63,37 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
   rtkStatus: null,
   rtkDownloadProgress: null,
   claudeCli: null,
+  supervisorSessions: [],
 
   refreshClaudeCli: async (opts) => {
     const resp = await window.electronAPI.detectClaude(opts);
     if (resp.success && resp.data) set({ claudeCli: resp.data });
     else console.warn('[detectClaude] failed:', resp.error);
+  },
+
+  refreshSessions: async () => {
+    const resp = await window.electronAPI.sessionList({ refresh: true });
+    if (resp.success && resp.data) set({ supervisorSessions: resp.data });
+  },
+
+  stopSession: async (jobId) => {
+    const resp = await window.electronAPI.sessionStop(jobId);
+    if (!resp.success) toast.error(resp.error ?? 'Could not stop the session');
+  },
+
+  removeSession: async (jobId) => {
+    const resp = await window.electronAPI.sessionRemove(jobId);
+    if (!resp.success) toast.error(resp.error ?? 'Could not remove the session');
+  },
+
+  adoptSession: async (projectId, jobId) => {
+    const resp = await window.electronAPI.sessionAdopt({ projectId, jobId });
+    if (!resp.success || !resp.data) {
+      toast.error(resp.error ?? 'Could not adopt the session');
+      return null;
+    }
+    await useProjects.getState().loadTasks(projectId);
+    return resp.data;
   },
 
   refreshTokenRollups: async () => {
@@ -109,8 +146,10 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
     {
       const prevState: Record<string, string> = {};
       // PTYs that have been idle at least once — skip the initial busy→idle that
-      // fires when a direct-spawn PTY first registers.
+      // fires when a task's activity entry first registers. `stopped` (session
+      // parked by the supervisor) counts as a resting state too.
       const hasBeenIdle = new Set<string>();
+      const isResting = (state: string) => state === 'idle' || state === 'stopped';
       // When each PTY entered busy, so we can ignore brief flashes (< 3s).
       const busySince: Record<string, number> = {};
 
@@ -147,7 +186,7 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
           }
         }
         for (const [id, info] of Object.entries(newActivity)) {
-          if (info.state === 'idle') hasBeenIdle.add(id);
+          if (isResting(info.state)) hasBeenIdle.add(id);
         }
         for (const id of hasBeenIdle) {
           if (!(id in newActivity)) hasBeenIdle.delete(id);
@@ -163,10 +202,19 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
         if (resp.success && resp.data) {
           for (const [id, info] of Object.entries(resp.data)) {
             prevState[id] = info.state;
-            if (info.state === 'idle') hasBeenIdle.add(id);
+            if (isResting(info.state)) hasBeenIdle.add(id);
           }
           set({ taskActivity: resp.data });
         }
+      });
+    }
+
+    // ── Supervisor sessions ────────────────────────────────
+    {
+      const unsub = window.electronAPI.onSessionList((rows) => set({ supervisorSessions: rows }));
+      cleanups.push(unsub);
+      void window.electronAPI.sessionList().then((resp) => {
+        if (resp.success && resp.data) set({ supervisorSessions: resp.data });
       });
     }
 

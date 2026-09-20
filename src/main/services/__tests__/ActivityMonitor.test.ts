@@ -230,3 +230,73 @@ describe('ActivityMonitor — getAll', () => {
     expect(all['b']).toBeDefined();
   });
 });
+
+describe('ActivityMonitor — supervisor reconcile (applySupervisor)', () => {
+  const POLL = 15_000;
+
+  it('creates the entry on first reconcile and applies the supervisor state', () => {
+    activityMonitor.applySupervisor('t1', { state: 'busy' }, POLL);
+    expect(activityMonitor.has('t1')).toBe(true);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
+  });
+
+  it('keeps a fresh hook-driven busy/idle reading for one poll interval', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setToolStart('t1', 'Bash', { command: 'ls' });
+    activityMonitor.applySupervisor('t1', { state: 'idle' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
+    expect(activityMonitor.getAll()['t1']!.tool?.toolName).toBe('Bash');
+
+    vi.advanceTimersByTime(POLL + 1);
+    activityMonitor.applySupervisor('t1', { state: 'idle' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+    expect(activityMonitor.getAll()['t1']!.tool).toBeUndefined();
+  });
+
+  it('applies stopped, waiting and error immediately, with detail', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setBusy('t1');
+    activityMonitor.applySupervisor('t1', { state: 'stopped', detail: 'Sleeping' }, POLL);
+    let info = activityMonitor.getAll()['t1']!;
+    expect(info.state).toBe('stopped');
+    expect(info.detail).toBe('Sleeping');
+
+    activityMonitor.applySupervisor('t1', { state: 'waiting', detail: 'input needed' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('waiting');
+
+    activityMonitor.applySupervisor(
+      't1',
+      { state: 'error', error: { type: 'supervisor', message: 'crashed' } },
+      POLL,
+    );
+    info = activityMonitor.getAll()['t1']!;
+    expect(info.state).toBe('error');
+    expect(info.error).toEqual({ type: 'supervisor', message: 'crashed' });
+  });
+
+  it('lifts a stopped task to busy even when a hook spoke recently', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.applySupervisor('t1', { state: 'stopped', detail: 'Sleeping' }, POLL);
+    activityMonitor.applySupervisor('t1', { state: 'busy' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
+    expect(activityMonitor.getAll()['t1']!.detail).toBeUndefined();
+  });
+
+  it('hooks clear the supervisor detail when they move the state', () => {
+    activityMonitor.applySupervisor('t1', { state: 'stopped', detail: 'Sleeping' }, POLL);
+    activityMonitor.setBusy('t1');
+    expect(activityMonitor.getAll()['t1']!.detail).toBeUndefined();
+  });
+
+  it('a recent reconcile keeps the safety valve from forcing idle', () => {
+    activityMonitor.start(mockSender as never);
+    activityMonitor.register('t1', 1);
+    activityMonitor.setBusy('t1');
+    vi.advanceTimersByTime(4 * 60_000);
+    activityMonitor.applySupervisor('t1', { state: 'busy' }, POLL);
+    vi.advanceTimersByTime(2 * 60_000);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+  });
+});

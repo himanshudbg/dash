@@ -14,6 +14,12 @@ vi.mock('../DatabaseService', () => ({
   DatabaseService: {
     getProjects: () => db.projects,
     getTasks: (projectId: string) => db.tasks.filter((t) => t.projectId === projectId),
+    getTask: (id: string) => db.tasks.find((t) => t.id === id),
+    setTaskSession: (id: string, session: { jobId: string | null; sessionId: string | null }) => {
+      const t = db.tasks.find((x) => x.id === id)!;
+      t.jobId = session.jobId;
+      t.sessionId = session.sessionId;
+    },
     relocateTask: (id: string, newPath: string, previousPath: string) => {
       const t = db.tasks.find((x) => x.id === id)!;
       t.previousPath = t.previousPath ?? previousPath;
@@ -49,7 +55,7 @@ function git(cwd: string, ...args: string[]): string {
 
 /** A repo at <root>/app with a legacy-layout worktree at <root>/worktrees/<name>. */
 function legacySetup(name = 'fix-login-a1b') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-mig-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dash-mig-')));
   dirs.push(root);
   const repo = path.join(root, 'app');
   fs.mkdirSync(repo);
@@ -95,6 +101,9 @@ function legacySetup(name = 'fix-login-a1b') {
       setupScript: null,
       teardownScript: null,
       previousPath: null,
+      jobId: null,
+      sessionId: null,
+      sessionStoppedAt: null,
       archivedAt: null,
       sortOrder: 0,
       totalTokens: 0,

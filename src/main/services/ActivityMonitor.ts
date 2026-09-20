@@ -1,5 +1,6 @@
 import type { WebContents } from 'electron';
 import type { ActivityState, ActivityInfo, ToolActivity, ActivityError } from '@shared/types';
+import type { SupervisorActivity } from './supervisorSession';
 
 interface PtyActivity {
   pid: number;
@@ -10,9 +11,13 @@ interface PtyActivity {
   /** Timestamp of the last hook-driven state mutation. Touched by every
    *  state-setting method below. Used by the safety valve. */
   lastHookTime: number;
+  /** Timestamp of the last supervisor reconcile that confirmed the state. */
+  lastSupervisorTime: number;
   tool: ToolActivity | null;
   error: ActivityError | null;
   compacting: boolean;
+  /** Reason shown with `stopped`/`waiting` (from the supervisor listing). */
+  detail: string | null;
 }
 
 /** Safety valve: if a busy/waiting PTY produces no hook events AND no PTY
@@ -74,17 +79,78 @@ class ActivityMonitorImpl {
   private sender: WebContents | null = null;
   private safetyValveTimer: ReturnType<typeof setInterval> | null = null;
 
-  register(ptyId: string, pid: number): void {
+  private fresh(pid: number): PtyActivity {
     const now = Date.now();
-    this.activities.set(ptyId, {
+    return {
       pid,
       state: 'idle',
       lastPtyOutputTime: now,
       lastHookTime: now,
+      lastSupervisorTime: 0,
       tool: null,
       error: null,
       compacting: false,
-    });
+      detail: null,
+    };
+  }
+
+  register(ptyId: string, pid: number): void {
+    this.activities.set(ptyId, this.fresh(pid));
+    this.emitAll();
+  }
+
+  /**
+   * Register only when unknown — keeps state across attach client restarts.
+   * No hook has spoken for a fresh entry, so `lastHookTime` starts at 0 and
+   * the first supervisor reading applies unconditionally.
+   */
+  ensure(ptyId: string): void {
+    if (this.activities.has(ptyId)) return;
+    const a = this.fresh(0);
+    a.lastHookTime = 0;
+    this.activities.set(ptyId, a);
+    this.emitAll();
+  }
+
+  has(ptyId: string): boolean {
+    return this.activities.has(ptyId);
+  }
+
+  /**
+   * Fold a supervisor listing row into the task's activity (design doc §6.6).
+   * Hooks stay the instant signal: a busy/idle reading from the supervisor
+   * is ignored while a hook spoke within the last poll interval, since hooks
+   * carry the tool label and land seconds earlier. `waiting`, `error` and
+   * `stopped` come only from the supervisor (or the permission hook) and
+   * always apply, as does anything that lifts a `stopped`/`error` state.
+   */
+  applySupervisor(ptyId: string, activity: SupervisorActivity, pollIntervalMs: number): void {
+    let a = this.activities.get(ptyId);
+    if (!a) {
+      a = this.fresh(0);
+      a.lastHookTime = 0;
+      this.activities.set(ptyId, a);
+    }
+    const now = Date.now();
+    a.lastSupervisorTime = now;
+    const hooksFresh = now - a.lastHookTime < pollIntervalMs;
+    const hookDriven = a.state === 'busy' || a.state === 'idle' || a.state === 'waiting';
+    const next = activity.state;
+    if ((next === 'busy' || next === 'idle') && hooksFresh && hookDriven) return;
+
+    const nextError = next === 'error' ? (activity.error ?? a.error) : null;
+    const nextDetail = activity.detail ?? null;
+    const changed =
+      a.state !== next ||
+      a.detail !== nextDetail ||
+      (a.error?.type ?? null) !== (nextError?.type ?? null) ||
+      (a.error?.message ?? null) !== (nextError?.message ?? null);
+    if (!changed) return;
+    a.state = next;
+    a.error = nextError;
+    a.detail = nextDetail;
+    if (next !== 'busy') a.tool = null;
+    if (next === 'idle' || next === 'stopped') a.compacting = false;
     this.emitAll();
   }
 
@@ -111,6 +177,7 @@ class ActivityMonitorImpl {
     a.state = 'idle';
     a.tool = null;
     a.compacting = false;
+    a.detail = null;
     this.emitAll();
   }
 
@@ -121,6 +188,7 @@ class ActivityMonitorImpl {
     if (a.state === 'busy') return;
     a.state = 'busy';
     a.error = null;
+    a.detail = null;
     this.emitAll();
   }
 
@@ -131,6 +199,7 @@ class ActivityMonitorImpl {
     if (a.state === 'waiting') return;
     a.state = 'waiting';
     a.tool = null;
+    a.detail = null;
     this.emitAll();
   }
 
@@ -142,6 +211,7 @@ class ActivityMonitorImpl {
     if (a.state !== 'busy') {
       a.state = 'busy';
       a.error = null;
+      a.detail = null;
     }
     this.emitAll();
   }
@@ -202,6 +272,7 @@ class ActivityMonitorImpl {
       if (a.tool) info.tool = a.tool;
       if (a.error) info.error = a.error;
       if (a.compacting) info.compacting = true;
+      if (a.detail) info.detail = a.detail;
       result[id] = info;
     }
     return result;
@@ -212,7 +283,7 @@ class ActivityMonitorImpl {
     let changed = false;
     for (const [id, a] of this.activities) {
       if (a.state !== 'busy' && a.state !== 'waiting') continue;
-      const silentSince = now - Math.max(a.lastHookTime, a.lastPtyOutputTime);
+      const silentSince = now - Math.max(a.lastHookTime, a.lastPtyOutputTime, a.lastSupervisorTime);
       if (silentSince > SAFETY_VALVE_MS) {
         console.warn(
           `[ActivityMonitor] safety valve forced idle ptyId=${id} prevState=${a.state} silentMs=${silentSince}`,

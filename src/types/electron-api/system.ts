@@ -37,5 +37,7 @@ export interface SystemApi {
   setClaudeEnvVars: (vars: Record<string, string>) => void;
   setSyncShellEnv: (enabled: boolean) => void;
   setUltracode: (enabled: boolean) => void;
+  /** `claude stop` every task session when Dash quits (default: sessions live on). */
+  setStopSessionsOnQuit: (enabled: boolean) => void;
   getClaudeAttribution: (projectPath?: string) => Promise<IpcResponse<string | null>>;
 }

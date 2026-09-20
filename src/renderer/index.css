@@ -928,6 +928,10 @@
     0 0 0 1px hsl(var(--status-unseen) / 0.4),
     0 0 10px hsl(var(--status-unseen) / 0.55);
 }
+.status-dot-stopped {
+  background: hsl(var(--muted-foreground) / 0.55);
+  box-shadow: 0 0 0 1px hsl(var(--muted-foreground) / 0.25);
+}
 .status-dot-err {
   background: hsl(var(--destructive));
   box-shadow:

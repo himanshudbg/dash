@@ -22,8 +22,8 @@ export interface PtyApi {
     IpcResponse<{
       reattached: boolean;
       isDirectSpawn: boolean;
-      /** Serialized mirror state (main-process headless xterm) on reattach. */
-      serializedState?: string;
+      /** Supervisor job the pane is attached to. */
+      jobId: string;
     }>
   >;
   ptyStart: (args: {
@@ -38,6 +38,9 @@ export interface PtyApi {
   ptyResize: (args: { id: string; cols: number; rows: number }) => void;
   ptyKill: (id: string) => void;
   ptyKillAwait: (id: string) => Promise<IpcResponse<void>>;
+  /** Stop + forget the task's supervisor job; the next ptyStartDirect resumes
+   *  the same session in a fresh job (picks up env/ports changes). */
+  ptyRestartSession: (taskId: string) => Promise<IpcResponse<void>>;
   ptyListForTask: (
     taskId: string,
     opts?: { kinds?: ('agent' | 'shell' | 'tui' | 'service')[]; featureId?: string },

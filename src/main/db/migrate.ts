@@ -336,5 +336,16 @@ export function runMigrations(): void {
     /* already exists */
   }
 
+  // Task sessions run under Claude Code's supervisor from 0.16: the job id and
+  // session UUID identify the session across Dash restarts; session_stopped_at
+  // records the last Dash- or supervisor-initiated stop.
+  for (const col of ['job_id', 'session_id', 'session_stopped_at']) {
+    try {
+      rawDb.exec(`ALTER TABLE tasks ADD COLUMN ${col} TEXT`);
+    } catch {
+      /* already exists */
+    }
+  }
+
   rawDb.pragma('foreign_keys = ON');
 }

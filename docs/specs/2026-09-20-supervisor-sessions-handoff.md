@@ -1,251 +1,219 @@
-# Handoff: Claude Code supervisor sessions (PR 1 done, PR 2 next)
+# Handoff: Claude Code supervisor sessions (PR 1 + PR 2 done)
 
-Written 2026-09-20 at the end of the session that produced the design doc,
-ran the spikes and implemented PR 1. Read this first, then the design doc:
+Written 2026-09-20 at the end of the session that verified PR 1 on a real
+machine and implemented PR 2. Design doc:
 `docs/specs/2026-09-20-claude-code-supervisor-sessions.md`.
 
 ## 1. Where things stand
 
 | Item | State |
 | --- | --- |
-| Branch | `claude/dash-cc-session-upgrade-h95ton`, pushed, three commits on top of `main` (`028f49f`, v0.15.1). No PR opened on purpose: the owner wants the whole feature built up on this branch and merged to `main` once satisfied. |
-| Commits | `2a08293` design doc · `caa75b1` spike results folded into the doc · `763c379` PR 1 code |
-| PR 1 (§6.1 + §6.2 of the design doc) | Implemented, type-checked, linted, 955 unit tests green. **Not yet exercised in a running Electron app.** |
-| PR 2 (§6.3–§6.10) | Not started. |
-| Design doc status line | Says PR 1 is implemented and PR 2 is next. Keep it current. |
+| Branch | `claude/dash-cc-session-upgrade-h95ton`, on top of `main` (`028f49f`, v0.15.1). No PR opened on purpose: the owner wants the whole feature built up here and merged to `main` once satisfied. |
+| Version | `package.json` bumped to **0.16.0** (the CLI floor is a breaking prerequisite; CI releases on every push to `main` and fails on a tag collision). |
+| PR 1 (§6.1 + §6.2) | Verified by hand on macOS with Claude Code 2.1.278 (see §3). One test-only fix: the migration test now resolves the temp dir's real path (`/private/tmp`). |
+| PR 2 (§6.3–§6.10) | Implemented and verified by hand (see §3). `pnpm type-check`, ESLint, Prettier and `pnpm test` (980 tests) green. |
+| Phase 2 (§7) | Not started. |
 
-Decisions the owner (nicolai@syv.ai) made, all recorded in §1 of the design
-doc, are settled. Do not re-open them: adopt the supervisor, Dash keeps
-creating worktrees, worktrees under `<repo>/.claude/worktrees/`, hard CLI
-floor 2.1.257 with direct spawn removed in PR 2, migration via a launch
-dialog, let agent view render in the pane on detach, multi-session per task
-is a later phase, foreign sessions shown read-only with "Adopt as task".
+Decisions the owner (nicolai@syv.ai) made are recorded in §1 of the design
+doc and were followed. Deviations from the plan text are listed in §4 below.
 
-## 2. What PR 1 changed (commit `763c379`)
+## 2. What PR 2 changed
 
-Version floor:
+Main process:
 
-- `src/main/services/claudeCli.ts`: `MIN_CLAUDE_VERSION = '2.1.257'`,
-  `parseClaudeVersion`, `compareClaudeVersions`, `versionMeetsMinimum`,
-  `describeUnsupportedClaude`. `isClaudeVersionAtLeast` still exists for any
-  hook event newer than the floor. `findLatestSessionId(cwd, previousPath?)`
-  now searches two transcript dirs.
-- `src/main/main.ts`: `detectClaudeCli()` is memoised and exported, plus
-  `redetectClaudeCli()`. `claudeCliCache` is unchanged in shape.
-- `src/main/ipc/ptyIpc.ts`: `pty:startDirect` awaits the probe and throws
-  `IpcError(..., 'UNSUPPORTED_CLI')` below the floor. New code in
-  `IpcErrorCode` (`src/shared/types.ts`), new `ClaudeCliInfo` type.
-- `src/main/ipc/appIpc.ts`: `app:detectClaude` returns `ClaudeCliInfo` and
-  takes `{ refresh?: boolean }`.
-- Renderer: `runtimeStore.claudeCli` + `refreshClaudeCli()` (called from
-  `init()`); `MainContent` renders `components/terminal/ClaudeCliGate.tsx`
-  instead of `TerminalPane` when `claudeCli && !claudeCli.supported`;
-  `TerminalSessionManager.startPty` no longer falls back to a shell on
-  `UNSUPPORTED_CLI`; `SettingsModal` Claude card shows "needs an update".
-- `ptyHookSettings.ts`: `PostCompact` and `StopFailure` hook entries are
-  unconditional (their version gates predate the floor).
-- README and CLAUDE.md prerequisites updated.
+- `src/main/services/SupervisorService.ts` (new): `dispatch` (`claude --bg
+  --name … [--permission-mode|--dangerously-skip-permissions] [--model]
+  [--settings ultracode] [--resume <sid>] [prompt]`), `list`, `find`, `stop`,
+  `respawn`, `remove`, and the reconcile loop `startPolling()` /
+  `stopPolling()` (15 s focused, 60 s blurred, plus focus, `powerMonitor`
+  resume, after every verb, and a debounced recursive `fs.watch` on
+  `~/.claude/jobs`). Every listing is pushed to the renderer as
+  `session:list` and folded into `ActivityMonitor.applySupervisor`. The
+  post-dispatch lookup retries because the row can trail the
+  `backgrounded ·` line; a missing `sessionId` is backfilled by the next
+  reconcile.
+- `src/main/services/supervisorSession.ts` (new, pure): arg builder, stdout
+  parser, zod-validated `claude agents --json` parser, state mapping
+  (`activityFromSupervisor`). Tests in `__tests__/supervisorSession.test.ts`
+  and `__tests__/SupervisorService.test.ts` (execFile mocked with the
+  promisify shape).
+- `src/main/services/claudeEnv.ts` (new): `buildClaudeEnv` (was
+  `buildDirectEnv` in ptyManager) plus the env/ultracode setters, shared by
+  dispatch and attach. `DASH_HOOK_PORT` is gone.
+- `src/main/services/ptyManager.ts`: `startDirectPty` = write hooks →
+  `ensureTaskSession` (attach the recorded job; dispatch when there is none,
+  when the supervisor no longer lists it, or when it is bound to another cwd
+  after a move; the first dispatch of a pre-supervisor task resumes
+  `findLatestSessionId(cwd, previousPath)`) → `spawnAttach` (`claude attach
+  <jobId>`). Agent PTYs have no mirror; a second call for the same id kills
+  the old attach client and attaches again. New `startSessionAttach` (foreign
+  sessions, PTY id `session:<jobId>`, no hooks), `stopTaskSession`,
+  `removeTaskSession`, `restartTaskSession` (stop + rm; next open resumes the
+  same session id in a fresh job), `setStopSessionsOnQuit`. `killAll` only
+  kills attach clients and shells; with the setting on it also `claude stop`s
+  every task job. `refreshActivePtyHooks` covers every task with a job, not
+  only the ones with an open pane.
+- `src/main/services/ActivityMonitor.ts`: `ensure`, `has`, `applySupervisor`
+  (hooks win for busy/idle within one poll interval; `waiting`, `error`,
+  `stopped` always apply), `detail` on `ActivityInfo`, `lastSupervisorTime`
+  feeds the safety valve. Tests added.
+- Hooks: `HookServer` writes `<userData>/hook-port` on start and removes it on
+  stop (`getHookPortFilePath`); `ptyHookSettings` commands read it
+  (`P=$(cat "<file>") || exit 0; …`). `hookSettingsMerge` recognises the
+  `$P` shape as Dash-owned. `main.ts` accepts hooks for any task with a
+  recorded job (an entry is created on the fly).
+- DB: `tasks.job_id`, `session_id`, `session_stopped_at`;
+  `DatabaseService.setTaskSession` / `markTaskSessionStopped` /
+  `getTasksWithSessions` / `getTaskByJobId`.
+- IPC: `pty:startDirect` passes the recorded job; `pty:restartSession`;
+  `session:list|attach|stop|remove|adopt` (`sessionIpc.ts` rewritten; the
+  unused `SessionWatcherService` and its IPC are deleted); `db:archiveTask`
+  stops the session, `db:deleteTask` removes it; `app:setStopSessionsOnQuit`.
+  `WorktreeMigrationService` stops + removes a task's job before `git
+  worktree move` (keeps `session_id` for the resume).
+- `src/main/entry.ts` / `window.ts`: `DASH_USER_DATA_DIR` and `DASH_DEV_URL`
+  env overrides so a checkout can run beside the installed Dash.
 
-Worktree relocation:
+Renderer:
 
-- `WorktreeService.getWorktreesDir` → `<repo>/.claude/worktrees`.
-  `getLegacyWorktreesDir` (old `<parent>/worktrees`), `isLegacyWorktreePath`,
-  `ensureWorktreesDir` (mkdir + exclude) and `ensureWorktreesExcluded`
-  (appends `.claude/worktrees/` to `.git/info/exclude`, resolved through
-  `git rev-parse --git-common-dir`). Pure helpers in `gitExclude.ts`.
-- `WorktreePoolService`: reserves created via `ensureWorktreesDir`; the
-  boot-time orphan sweep scans both the new and the legacy dir.
+- `TerminalSessionManager`: Claude mode attaches with no snapshot, mirror or
+  kill-and-respawn; attach-client exit → `terminal.reset()` + Detached card
+  (`onDetached`, `reattach()`); `restart()` on an agent pane calls
+  `ptyRestartSession` then attaches (this is also how the ports flow's
+  `restartAllForTask` re-dispatches with a fresh env). No shell fallback for
+  agent panes. `ptyExitFallback` gained the `detached` action and
+  `foreignSessionJobId`.
+- `TerminalPane`: "Detached from session" card with Re-attach and the key
+  hints (`←` agent view, Esc, Ctrl+Z).
+- `runtimeStore`: `stopped` counts as a resting state for the done-sound
+  logic; `supervisorSessions` + `refreshSessions` / `stopSession` /
+  `removeSession` / `adoptSession`.
+- Sidebar: fifth state `stopped` (grey dot, `.status-dot-stopped`) in
+  `TaskCard`, `LeftSidebar`, `RotationSection`, `projectActivity`;
+  `ForeignSessionsSection` ("Other sessions (n)" per project) with Attach
+  (modal `components/session/SessionAttachModal.tsx` hosting a `TerminalPane`
+  at `session:<jobId>`), Stop, Remove, Adopt as task. Ownership logic in
+  `leftSidebar/foreignSessions.ts` (tested): a row is owned by job id **or by
+  directory**, because the renderer's task list lags a fresh dispatch.
+- Settings: "Stop sessions on quit" (`stopSessionsOnQuit`, default off).
+  Ultracode description says it applies on the next (re)start.
+- `TokenBadge` tooltip notes that session summaries are billed outside what
+  Dash counts.
+- Docs: README, CLAUDE.md, design doc status line.
 
-Migration:
+## 3. What was verified by hand (macOS, Claude Code 2.1.278)
 
-- DB: `tasks.previous_path` (migration in `migrate.ts`, column in
-  `schema.ts`, `Task.previousPath` in shared types, `DatabaseService.relocateTask`).
-  `last_session_id` stays unused.
-- `worktreeMigrationPlan.ts` (pure: `buildMigrationPlan`, `isInsideDir`,
-  `isWorktreeLockedError`) and `WorktreeMigrationService.ts`
-  (`plan()`, `migrateProject(projectId)`): kills the task's PTYs via
-  `listForTask` + `killPtyAwait`, `git worktree move`, unlock-and-retry on a
-  locked worktree, `relocateTask`, removes the empty legacy dir, per-task
-  failure list. Handles "destination exists" (fail) and "already moved by
-  hand" (record only).
-- IPC `worktree:migrationPlan` / `worktree:migrate` (`worktreeIpc.ts`),
-  preload entries `worktreeMigrationPlan` / `worktreeMigrate`, typings in
-  `src/types/electron-api/worktree.ts`, telemetry event `worktree_migrated`.
-- Renderer: `components/project/WorktreeMigrationModal.tsx` (Later / Move
-  now / Don't ask again; localStorage key `dash.worktreeMigration.dismissed`).
-  Wired in `App.tsx`: runs once per launch after every project's tasks are
-  loaded; on completion disposes the moved tasks' cached terminals
-  (`sessionRegistry.dispose(taskId)` and `disposeByPrefix('shell:<id>')`)
-  and reloads tasks so panes remount on the new path.
-- Token totals: `aggregateTokenStatsForTaskPath` accepts a list;
-  `TokenStatsService` passes `[task.path, task.previousPath]`.
+Run from this worktree with an isolated data dir (see §5), scratch git repo as
+the project.
 
-Tests added: `claudeCli.test.ts` (floor helpers), `gitExclude.test.ts`,
-`worktreeMigrationPlan.test.ts`, `WorktreeService.location.test.ts` (real
-git repo, exclude file, `git status` clean), `WorktreeMigrationService.test.ts`
-(real git repos: move, lock retry, destination exists, already moved). The
-renderer bridge mock (`stores/__tests__/helpers/electronApiMock.ts`) gained
-`detectClaude`.
+PR 1:
 
-## 3. Environment notes for this container
+- New task → worktree at `<repo>/.claude/worktrees/<slug>-<hash>`, reserve at
+  `_reserve-<hash>` next to it, `.git/info/exclude` gained the entry once,
+  `git status` in the main checkout clean.
+- Legacy-layout task → "Move task worktrees" dialog after tasks load; Later
+  re-asks after reload; Move now moves the worktree, records `previous_path`,
+  removes the empty legacy dir, shows "Moved 1 of 1". Done twice.
+- Version floor (floor temporarily set to 9.9.9): gate panel replaces the
+  pane with both versions, `claude update` and "Check again"; git, ports and
+  shell panels keep working; Settings Claude card says "needs an update".
 
-- Claude Code 2.1.278 is installed at `/opt/node22/bin/claude` and works,
-  including `claude --bg` and the supervisor. The spike scratch repo lived in
-  the session scratchpad and is gone; spike sessions and the daemon were
-  cleaned up.
-- `pnpm install` succeeds, but the Electron binary download fails (assertion
-  in `node_modules/electron/install.js`), so `pnpm test` (which runs vitest
-  under Electron's Node) cannot run here. `npx vitest run` under Node 22
-  runs the whole suite and is what was used; `better-sqlite3` is built for
-  Node 22 in this checkout. Do not `npm rebuild` anything. On a real machine
-  use `pnpm test` per CLAUDE.md.
-- `pnpm type-check`, `npx eslint`, `npx prettier --check` all work.
-  Husky's pre-commit hook was bypassed with `git -c core.hooksPath=/dev/null`
-  because `pnpm exec lint-staged` needs the Electron-less toolchain to behave;
-  lint and prettier were run by hand instead.
-- `docs/plans/` is gitignored; design docs go in `docs/specs/`.
-- Commit messages must end with the attribution lines the session
-  reminder gives (`Co-Authored-By` and `Claude-Session`). No model
-  identifiers in commits or code.
+PR 2:
 
-## 4. What to do first: manual verification of PR 1
+- Opening a task dispatches `--bg` in its worktree (job listed with the right
+  cwd and name), attaches, prompt round-trip works, hooks flip busy → idle
+  through the port file, statusLine feeds context/rate limits.
+- Renderer reload re-attaches to the same job (no new dispatch). Ctrl+Z →
+  Detached card → Re-attach restores the full session with history.
+- Quit (SIGTERM) → port file removed, session keeps running; relaunch →
+  reconcile shows the task idle, missing `session_id` backfilled, port file
+  rewritten; opening the task attaches again.
+- `pty:restartSession` (stop + rm) → reload → re-dispatched with `--resume`;
+  the session still knows its earlier answer. Note: the job id is the same
+  as before, because the id is derived from the session UUID.
+- Foreign session started by hand (`claude --bg` in the project root) shows
+  under "Other sessions (1)" with id and age; menu → Adopt as task creates an
+  in-place task (branch `main`, `use_worktree` 0) that opens attached to the
+  existing conversation.
+- Archive → job stopped (no pid), `session_stopped_at` set; restore + open →
+  `claude attach` wakes it.
+- A migrated legacy task with no transcript dispatches a fresh job.
+- "Stop sessions on quit" on → quit stops every task job; relaunch shows them
+  as grey "Sleeping — opening the task resumes it"; opening one wakes it.
 
-Nobody has run the app with these changes. On a machine with Dash's toolchain
-and Claude Code ≥ 2.1.257:
+## 4. Deviations from the plan, and things to know
 
-1. `pnpm install && pnpm rebuild && pnpm dev`.
-2. Create a task in a git project. Confirm the worktree lands at
-   `<repo>/.claude/worktrees/<slug>-<hash>`, that `git status` in the main
-   checkout stays clean, and that `.git/info/exclude` gained the entry once.
-3. Seed a legacy layout (a task whose `path` is under `<parent>/worktrees/`;
-   easiest is checking out `main`, creating a task, then switching back to
-   this branch). Launch: the "Move task worktrees" dialog must appear after
-   tasks load. Test Later (re-asks next launch), Don't ask again, and Move now
-   with the task's terminal open (its PTY is killed, the pane remounts, the
-   Claude session resumes because `findLatestSessionId` searches
-   `previous_path`). Check token totals still include the old transcripts.
-4. Version floor: temporarily set `MIN_CLAUDE_VERSION` to something above the
-   installed version and confirm the gate panel replaces the terminal, git and
-   ports panels keep working, "Check again" re-probes, and the Settings
-   Claude card shows the update state. Then with no `claude` on PATH.
-5. Watch for the one known soft spot: if `detectClaude` has not answered yet
-   (`claudeCli === null`) the terminal mounts and relies on the main-side
-   refusal; confirm no shell fallback appears in the task pane in that case.
+- `findLatestSessionId` / `pickLatestSessionId` were **kept** (the handoff
+  said remove them): the design doc §6.2.4 needs the newest transcript for
+  the first supervisor dispatch of every pre-supervisor task, or upgrading
+  would drop every existing conversation. It runs once per task; afterwards
+  `tasks.session_id` is the source.
+- Foreign-session **Attach opens a modal** with a `TerminalPane`, instead of
+  swapping the main pane; that keeps the active-task model untouched.
+- There is no keybinding help page for terminal keys in Dash, so the Ctrl+Z /
+  Esc / `←` hints live on the Detached card.
+- `SessionWatcherService` + the old `session:*` IPC were removed; the new
+  `session:*` names are reused for supervisor sessions.
+- Ports env changes re-dispatch through the existing restart path
+  (`restartAllForTask` → `session.restart()` → `pty:restartSession`). Not
+  exercised through the ports UI in this session.
+- The renderer's `Task.jobId` is stale until the task list reloads (nothing
+  reloads it after a dispatch). Only `foreignSessions.ts` reads it, and it
+  also matches by directory, so this is harmless today.
+- Under `--bg` a task with permission mode "default" shows Claude Code's
+  "auto mode on" in the status bar; `acceptEdits` shows "accept edits on".
+  That is Claude Code's choice for background sessions, not Dash's.
+- Not verified: a real pointer click on the migration dialog's buttons (the
+  CDP driver's synthetic mouse events never reached the page for that modal
+  while DOM `.click()` worked; every other flow was driven the same way);
+  mouse-wheel scrolling in fullscreen attach mode; the workspace-trust dialog
+  on first attach into a fresh worktree (none appeared here); Windows.
+- Pre-existing, untouched: `git:listBranches` does not hide `_reserve/*`
+  branches, so the New Task base-branch dropdown lists the reserve branch.
+- The `PortsConfigWatcher.test.ts` "idempotent" case is timing-flaky on this
+  machine (fails on some runs, passes on others); unrelated to this branch.
 
-Fix anything found, then bump the version. The design doc suggests 0.16.0
-with PR 2, since the floor is the breaking prerequisite; the owner may prefer
-to cut it earlier.
+## 5. Environment notes for this machine
 
-## 5. PR 2: implementing the supervisor (§6.3–§6.10)
+- Node 24 via nvm; the shell's `node`/`pnpm` wrappers are broken lazy-load
+  functions. Per command: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:/opt/homebrew/bin:$PATH"; unset -f node npm npx pnpm nvm _load_nvm`.
+  `npx` is broken; call `./node_modules/.bin/<tool>` directly.
+- `pnpm test` runs under Electron's Node (works here). Rebuild natives with
+  `./node_modules/.bin/electron-rebuild -f -w node-pty,better-sqlite3`.
+- The owner runs Dash itself (a `pnpm dev` on Vite port 3000 with the real
+  data dir) — never run a second instance against it. Use
+  `DASH_USER_DATA_DIR=<scratch>/userdata DASH_DEV_URL=http://localhost:3001 ./node_modules/.bin/electron dist/main/main/entry.js --dev --remote-debugging-port=9444`
+  after `pnpm build:main` and a separate `pnpm dev:renderer`. Port 9333 is
+  taken by another Electron app on this machine.
+- Drive the window over CDP with a dependency-free Node script
+  (`Runtime.evaluate` for `window.electronAPI.*` and DOM clicks,
+  `Page.captureScreenshot`); type into a pane with
+  `window.electronAPI.ptyInput({ id, data })`. Sessions dispatched this way
+  land in the real `~/.claude/jobs`; name them recognisably and `claude rm`
+  them afterwards.
+- `docs/plans/` is gitignored; design docs go in `docs/specs/`. Prettier
+  reflows Markdown tables; run it on `.ts`/`.tsx` only.
 
-Read §4.1 of the design doc before writing code; the spike results changed
-several details. The load-bearing facts, verified against 2.1.278:
+## 6. What is left
 
-- `claude --bg --name <task> [--permission-mode …|--dangerously-skip-permissions] [--model …] [--settings '{"ultracode":true}'] [--resume <sid>] [prompt]`
-  starts a session with **no prompt required** (state `blocked`, "idle — send
-  a prompt to start"). Stdout: `backgrounded · <id> · <name>`; parse with
-  `/^backgrounded · ([0-9a-f]{8})/m`. `--session-id` is ignored. The job id
-  is the first 8 hex chars of `sessionId`, so one `claude agents --json --cwd <worktree>`
-  call right after dispatch gives the row.
-- `claude agents --json --all` costs ~0.3 s. `fs.watch(~/.claude/jobs, {recursive: true})`
-  fires on `state.json` rewrites; use it as a trigger only, never read those
-  files. `--cwd <repo>` now includes Dash worktrees.
-- The dispatch-time env is frozen into the job and reused on every respawn
-  (`respawnFlags` in state.json). Ports/user env survive. **Therefore the
-  hook port must come from a file, not `DASH_HOOK_PORT`** (Dash's port
-  changes per launch, sessions outlive Dash). Plan: `<userData>/hook-port`,
-  written by `HookServer.start`, removed on quit; hook command becomes
-  `P=$(cat "<path>" 2>/dev/null) || exit 0; [ -n "$P" ] || exit 0; curl … http://127.0.0.1:$P/hook/<ep>?ptyId=<taskId> …; exit 0`.
-  Drop `DASH_HOOK_PORT` from `buildDirectEnv` and `RESERVED_ENV_KEYS`.
-- Existing hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop`,
-  `SessionEnd`, statusLine) fire for background sessions. The `Notification`
-  matchers `agent_needs_input` / `agent_completed` **did not fire** in the
-  session's own hooks; do not add them. "Needs input" = JSON
-  `status: waiting, waitingFor: "input needed"` plus the existing
-  `permission_prompt` hook (AskUserQuestion triggers it).
-- `claude attach <id>` in node-pty: alternate screen + mouse tracking; `←`
-  on an empty prompt opens agent view in the same PTY (first showing the
-  workspace-trust dialog for a fresh dir); Esc exits the attach process with
-  code 0. Ctrl+Z also exits. A clean exit means "detached", not "session
-  ended". Decision: let agent view render; on exit show a "Detached" card
-  with Re-attach (`ptyExitFallback` gains a `detached` action; agent PTY exit
-  no longer respawns a shell).
-- A background session inside a Dash linked worktree is **not** re-isolated;
-  no `git worktree lock` is placed on Dash worktrees.
-- Migration into the supervisor world: a task that already has a `job_id`
-  and whose worktree moves needs `claude stop` + `claude rm <job_id>` before
-  `--bg --resume <sid>` from the new cwd, or the dispatch fails with
-  "working directory no longer exists" **and queues the prompt**. Resume
-  dispatches must re-pass `--name` and the permission/model flags or the job
-  gets an auto-generated name and `respawnFlags: []`. Transcripts keep
-  writing under the old encoded dir (`previous_path` already handles this).
-- Summaries and auto names are model calls outside the transcript; Dash's
-  cost totals cannot count them. Note it in the cost tooltip.
+- Merge to `main` when the owner is satisfied (version 0.16.0 is already in
+  `package.json`; do not create the tag by hand).
+- Optional polish: reload the task row after a dispatch so `Task.jobId` is
+  fresh; hide `_reserve/*` in `git:listBranches`; the optional
+  "kill the attach PTY when a task is hidden for N minutes" from §6.4.
+- Phase 2 (§7 of the design doc): several sessions per task (`sessions`
+  table, `/fork`), hooks keyed by the payload's `session_id`, cross-session
+  messaging for diff comments, PR link detection.
 
-Suggested build order (each step keeps `pnpm type-check` and tests green):
-
-1. `SupervisorService.ts` (new, `execFile` only, never a PTY): `dispatch`,
-   `list`, `stop`, `respawn`, `remove`, `startPolling`. zod-validate the JSON
-   in `src/main/ipc/schemas.ts` with a loose object. Move `buildDirectEnv`
-   out of `ptyManager` into `claudeEnv.ts` so dispatch and attach share it.
-   Unit tests: arg building, stdout parsing, JSON with missing optional
-   fields, state mapping.
-2. DB: `tasks.job_id`, `tasks.session_id`, `tasks.session_stopped_at`;
-   `DatabaseService.setTaskSession`. Leave `conversations` alone (phase 2
-   renames it to `sessions`).
-3. `ptyManager.startDirectPty` → dispatch if no job (or job missing from
-   `--all`), then `pty.spawn(claudePath, ['attach', jobId], …)`. Remove
-   `findLatestSessionId` + `pickLatestSessionId` and their tests, the
-   `resumeSessionId` branch of `buildClaudeArgs`, the agent-PTY mirror and
-   snapshot restore (keep for shell/service PTYs). `writeHookSettings` before
-   dispatch. `killAll` on quit only kills attach clients; new setting
-   `stopSessionsOnQuit` (default off). New IPC `pty:stopSession` /
-   `pty:removeSession`; archive → stop, delete → remove.
-4. Hooks: port file (above). Keep everything else.
-5. `ActivityMonitor` reconcile: poll `list({all:true})` on 15 s focused /
-   60 s blurred, on focus, on `powerMonitor` resume, after dispatch/stop, and
-   on the jobs-dir watch (1 s debounce). Mapping in §6.6 of the design doc;
-   new `ActivityState` value `stopped`. `runtimeStore` sound/unseen logic and
-   `TaskCard`/`projectActivity` get the fifth state.
-6. Renderer terminal: drop snapshot fetch + mirror restore + kill-and-respawn
-   for Claude mode in `TerminalSessionManager.attach`; "Detached" card;
-   keybinding help lines for Ctrl+Z and Esc.
-7. Foreign sessions: `ForeignSessionsSection.tsx` per project (rows from the
-   listing whose cwd is inside a project and whose id is no task's `job_id`);
-   Attach (PTY id `session:<jobId>`, `taskId: null`, no hooks written), Stop,
-   Remove, Adopt as task (`saveTask` with cwd, branch from
-   `git branch --show-current`, `useWorktree` from `--git-common-dir` vs
-   `--git-dir`).
-8. Removals: `SessionWatcherService.ts` + `session:*` IPC/preload (unused by
-   the renderer); narrow `ptyManager.mirror.test.ts` to shell PTYs.
-9. Docs: CLAUDE.md architecture bullets (sessions live under the supervisor;
-   hook port file), README feature list, design doc status line.
-
-Things the spike could not settle and PR 2 must check on a real machine:
-mouse-wheel scrolling through xterm.js in fullscreen attach mode; the
-workspace-trust dialog on first attach into a fresh worktree (background
-dispatch itself ran without one); whether `CLAUDE_CODE_NO_FLICKER=1` still
-matters in fullscreen mode (harmless to keep); Windows is unsupported for the
-agent PTY until someone verifies the supervisor there.
-
-## 6. Phase 2 (after PR 2), not scheduled
-
-§7 of the design doc: several sessions per task via a `sessions` table,
-`/fork`, hooks keyed by the payload's `session_id` instead of `?ptyId=<taskId>`
-(needed before two sessions share one worktree), posting into a session's
-inbox socket (`CLAUDE_CODE_MESSAGING_SOCKET`) for "send diff comments to the
-agent", and feeding Claude Code's PR link detection into the GitHub badge.
-
-## 7. Gotchas carried over from the codebase
+## 7. Gotchas carried over
 
 - Any new hook event newer than 2.1.257 must still be gated with
-  `isClaudeVersionAtLeast`, or Claude Code drops the whole
-  `settings.local.json` (GH #127).
-- `writeHookSettings` must never run for shell PTYs (it would clobber the
-  task's `?ptyId=` and freeze the activity dot).
-- Selectors returning derived arrays/objects need `useShallow`.
+  `isClaudeVersionAtLeast` (GH #127).
+- `writeHookSettings` must never run for shell PTYs or foreign-session
+  attach clients.
+- A Zustand selector returning a fresh object/array/Set must use `useShallow`
+  or `useMemo` over a stable reference — a selector building Sets blanked the
+  whole renderer during this session.
 - Zod v4 style in IPC handlers: `z.looseObject({...})`.
 - File naming: PascalCase for classes/components, camelCase for function
-  modules; the `check-file` ESLint rule enforces it.
-- Prettier reflows Markdown tables; run it only on `.ts`/`.tsx` unless you
-  want the design doc's diff to balloon.
+  modules (`check-file` ESLint rule).

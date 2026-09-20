@@ -195,6 +195,7 @@ export function App() {
   const effortLevel = useSettings((s) => s.effortLevel);
   const syncShellEnv = useSettings((s) => s.syncShellEnv);
   const ultracode = useSettings((s) => s.ultracode);
+  const stopSessionsOnQuit = useSettings((s) => s.stopSessionsOnQuit);
   const customClaudeEnvVars = useSettings((s) => s.customClaudeEnvVars);
 
   // Sync desktop notification settings to main process
@@ -239,6 +240,10 @@ export function App() {
   useEffect(() => {
     window.electronAPI.setUltracode?.(ultracode);
   }, [ultracode]);
+  // Sync stop-sessions-on-quit to main process (read in the before-quit handler)
+  useEffect(() => {
+    window.electronAPI.setStopSessionsOnQuit?.(stopSessionsOnQuit);
+  }, [stopSessionsOnQuit]);
   // Sync Claude Code env vars to main process
   useEffect(() => {
     const vars: Record<string, string> = { ...customClaudeEnvVars };

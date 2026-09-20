@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, ne, asc, sql } from 'drizzle-orm';
+import { eq, desc, and, isNull, ne, asc, sql, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { initDb, getDb } from '../db/client';
 import { runMigrations } from '../db/migrate';
@@ -267,6 +267,54 @@ export class DatabaseService {
    * first pre-move location: a task moved twice still points at the oldest
    * transcript dir, and the intermediate one is a subdirectory of neither.
    */
+  /**
+   * Record the task's supervisor session after a dispatch, or clear the job
+   * after `claude rm` (pass `jobId: null`; keep `sessionId` so the next
+   * dispatch resumes the conversation). `sessionStoppedAt` is reset here and
+   * set by markTaskSessionStopped.
+   */
+  static setTaskSession(
+    id: string,
+    session: { jobId: string | null; sessionId: string | null } | null,
+  ): void {
+    const db = getDb();
+    db.update(tasks)
+      .set({
+        jobId: session?.jobId ?? null,
+        sessionId: session?.sessionId ?? null,
+        sessionStoppedAt: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(tasks.id, id))
+      .run();
+  }
+
+  static markTaskSessionStopped(id: string): void {
+    const db = getDb();
+    db.update(tasks)
+      .set({ sessionStoppedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      .where(eq(tasks.id, id))
+      .run();
+  }
+
+  /** Every task (archived included) that has a supervisor job recorded. */
+  static getTasksWithSessions(): Task[] {
+    const db = getDb();
+    return db
+      .select()
+      .from(tasks)
+      .where(isNotNull(tasks.jobId))
+      .all()
+      .map((row) => this.mapTask(row));
+  }
+
+  /** Task whose recorded job id matches, if any. */
+  static getTaskByJobId(jobId: string): Task | undefined {
+    const db = getDb();
+    const row = db.select().from(tasks).where(eq(tasks.jobId, jobId)).get();
+    return row ? this.mapTask(row) : undefined;
+  }
+
   static relocateTask(id: string, newPath: string, previousPath: string): Task {
     const db = getDb();
     const current = db.select().from(tasks).where(eq(tasks.id, id)).get();
@@ -562,6 +610,9 @@ export class DatabaseService {
       setupScript: row.setupScript ?? null,
       teardownScript: row.teardownScript ?? null,
       previousPath: row.previousPath ?? null,
+      jobId: row.jobId ?? null,
+      sessionId: row.sessionId ?? null,
+      sessionStoppedAt: row.sessionStoppedAt ?? null,
       archivedAt: row.archivedAt,
       sortOrder: row.sortOrder,
       totalTokens: row.totalTokens ?? 0,

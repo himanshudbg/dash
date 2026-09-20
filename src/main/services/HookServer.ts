@@ -1,6 +1,9 @@
 import * as http from 'http';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { EventEmitter } from 'events';
-import { BrowserWindow, Notification } from 'electron';
+import { app, BrowserWindow, Notification } from 'electron';
 import { eq } from 'drizzle-orm';
 import { activityMonitor } from './ActivityMonitor';
 import { contextUsageService } from './ContextUsageService';
@@ -18,6 +21,22 @@ export const hookEvents = new EventEmitter();
 
 /** Maximum JSON body size for hook payloads (64KB). */
 const MAX_HOOK_BODY_BYTES = 65_536;
+
+/**
+ * File the hook commands read the HookServer port from. The port changes on
+ * every Dash launch while task sessions live on under Claude Code's supervisor
+ * (which also freezes the dispatch-time env into the job), so the port cannot
+ * travel in the environment. Written by start(), removed by stop(); a session
+ * running while Dash is closed finds no file and its hooks no-op.
+ */
+export function getHookPortFilePath(): string {
+  try {
+    return path.join(app.getPath('userData'), 'hook-port');
+  } catch {
+    // No `app` (unit tests) — keep the shape, point at a harmless location.
+    return path.join(os.tmpdir(), 'dash-hook-port');
+  }
+}
 
 class HookServerImpl {
   private server: http.Server | null = null;
@@ -337,6 +356,7 @@ class HookServerImpl {
         const addr = this.server!.address();
         if (addr && typeof addr === 'object') {
           this._port = addr.port;
+          this.writePortFile(this._port);
           console.error(`[HookServer] Listening on 127.0.0.1:${this._port}`);
           resolve(this._port);
         } else {
@@ -353,6 +373,25 @@ class HookServerImpl {
       this.server.close();
       this.server = null;
       this._port = 0;
+    }
+    this.removePortFile();
+  }
+
+  private writePortFile(port: number): void {
+    try {
+      const file = getHookPortFilePath();
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `${port}\n`);
+    } catch (err) {
+      console.error('[HookServer] Failed to write the hook port file:', err);
+    }
+  }
+
+  private removePortFile(): void {
+    try {
+      fs.rmSync(getHookPortFilePath(), { force: true });
+    } catch {
+      // Best effort — a stale file is overwritten on the next start.
     }
   }
 }

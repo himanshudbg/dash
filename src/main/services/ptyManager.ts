@@ -1,17 +1,23 @@
-import * as os from 'os';
+import * as fs from 'fs';
 import { type WebContents } from 'electron';
 import { activityMonitor } from './ActivityMonitor';
 import { hookServer } from './HookServer';
 import { contextUsageService } from './ContextUsageService';
-import { RtkService } from './RtkService';
 import { stripHostTerminalEnv } from './hostTerminalEnv';
 import { WorkspacePortsRuntime } from './WorkspacePortsRuntime';
 import { TerminalMirror } from './TerminalMirror';
 import { terminalSnapshotService } from './TerminalSnapshotService';
 import { ensureShellConfig } from './ptyShellConfig';
 import { findClaudePath, findLatestSessionId } from './claudeCli';
+import { buildClaudeEnv } from './claudeEnv';
+import { supervisorService } from './SupervisorService';
+import { DatabaseService } from './DatabaseService';
 import { writeHookSettings, setCommitAttributionValue } from './ptyHookSettings';
 import type { PermissionMode, TaskModel } from '@shared/types';
+
+// Launch configuration setters live in claudeEnv (shared with the supervisor
+// dispatch); re-exported so the IPC layer keeps one import site.
+export { setClaudeEnvVars, setSyncShellEnv, setUltracode } from './claudeEnv';
 
 export type PtyKind = 'agent' | 'shell' | 'tui' | 'service';
 
@@ -23,16 +29,23 @@ interface PtyRecord {
   kind: PtyKind;
   taskId: string | null;
   featureId: string | null;
+  /** Supervisor job the `claude attach` client is connected to (agent PTYs). */
+  jobId: string | null;
   /**
    * Headless xterm mirror fed every output chunk (the VS Code pty-host
    * pattern). Serialized on reattach so a fresh renderer xterm shows the
    * full terminal state — including output emitted while no renderer was
-   * attached. Persisted to the snapshot files on kill/exit/quit.
+   * attached. Persisted to the snapshot files on kill/exit/quit. Shell and
+   * service PTYs only: an agent PTY is a `claude attach` client that repaints
+   * its whole screen on every attach, so there is nothing to mirror.
    */
   mirror: TerminalMirror | null;
 }
 
 const ptys = new Map<string, PtyRecord>();
+
+/** PTY id of the attach client for a session that belongs to no task. */
+export const FOREIGN_SESSION_PTY_PREFIX = 'session:';
 
 /** Persist a mirror's state to the snapshot files (sync — quit-safe). */
 function persistMirrorSync(id: string, mirror: TerminalMirror): void {
@@ -76,21 +89,17 @@ export function persistAllMirrors(): void {
 }
 
 /**
- * Per-task initial prompt to pass as `claude`'s positional argument when the
- * task's agent PTY is spawned. Used by the ports onboarding migrate path:
- * the full inlined setup-prompt body (see PortsSetupPrompt) is stashed here
- * before the renderer triggers the spawn, so CC auto-submits it as soon as
- * the trust-this-directory gate clears — no post-spawn keystroke injection
- * needed (which previously raced first-run gates and flashed visibly in the
- * input box).
+ * Per-task initial prompt to pass as the dispatch's positional argument when
+ * the task's session is first started under the supervisor. Used by the ports
+ * onboarding migrate path: the full inlined setup-prompt body (see
+ * PortsSetupPrompt) is stashed here before the renderer triggers the spawn, so
+ * CC auto-submits it as soon as the session starts — no post-spawn keystroke
+ * injection needed (which previously raced first-run gates and flashed
+ * visibly in the input box).
  *
- * Single-use: consumed (and removed) by startDirectPty's first spawn. A
- * re-attach to an existing PTY is a no-op — the prompt only applies to the
- * very first claude process for the task. Consequence: if that first spawn
- * dies before the user accepts the trust gate, the prompt is gone and a
- * respawn starts a plain session (the ports TUI then surfaces its
- * 30-minute timeout). The consumption breadcrumb in the ports debug log is
- * the trail for diagnosing that.
+ * Single-use: consumed (and removed) by the first dispatch for the task. A
+ * re-attach to an existing session is a no-op — the prompt only applies to the
+ * very first session for the task.
  */
 const pendingInitialPrompts = new Map<string, string>();
 
@@ -109,30 +118,13 @@ export function discardInitialPrompt(taskId: string): void {
   pendingInitialPrompts.delete(taskId);
 }
 
-// Custom environment variables passed to spawned Claude processes (set from renderer settings).
-let claudeEnvVars: Record<string, string> = {};
+// When true, `claude stop` every task session before quitting (setting
+// `stopSessionsOnQuit`, default off: sessions outlive Dash by design).
+let stopSessionsOnQuit = false;
 
-// When true, inherit the full parent process.env as a base instead of the minimal set.
-let syncShellEnv = false;
-
-// When true, launch Claude sessions in ultracode (X-High reasoning + multi-agent
-// workflow orchestration) via `--settings '{"ultracode":true}'`. ultracode is
-// session-only and can't be set through CLAUDE_CODE_EFFORT_LEVEL or --effort, so
-// it's applied per-spawn here rather than through the effort env var.
-let ultracode = false;
-
-const RESERVED_ENV_KEYS = new Set([
-  'PATH',
-  'HOME',
-  'USER',
-  'TERM',
-  'COLORTERM',
-  'TERM_PROGRAM',
-  'COLORFGBG',
-  // Dash owns this — it points hooks at the live HookServer port. A user/ports
-  // override would misroute or break the no-op-outside-Dash guard.
-  'DASH_HOOK_PORT',
-]);
+export function setStopSessionsOnQuit(enabled: boolean): void {
+  stopSessionsOnQuit = enabled;
+}
 
 export function setCommitAttribution(value: string | undefined): void {
   setCommitAttributionValue(value);
@@ -149,22 +141,34 @@ export interface RefreshResult {
 }
 
 /**
- * Rewrite settings.local.json for every active PTY. Claude Code re-reads
- * settings per tool call, so this flips hooks live. Returns per-task write
- * failures so callers (RTK toggle, attribution change) can surface a
- * "saved, but N tasks didn't pick it up" message instead of silently
- * returning success.
+ * Rewrite settings.local.json for every task with a live session. Claude Code
+ * re-reads settings per tool call, so this flips hooks live — also for a
+ * session nobody is attached to right now. Returns per-task write failures so
+ * callers (RTK toggle, attribution change) can surface a "saved, but N tasks
+ * didn't pick it up" message instead of silently returning success.
  */
 export function refreshActivePtyHooks(): RefreshResult {
   const failures: RefreshFailure[] = [];
+  const targets = new Map<string, string>();
   for (const [id, rec] of ptys) {
     // Shell PTYs (terminal drawer) share cwd with the task PTY but don't run
     // Claude Code and aren't tracked by ActivityMonitor. Writing hook settings
     // for them clobbers the task's settings.local.json with `ptyId=shell:…`,
     // so every subsequent hook event lands in ActivityMonitor's no-op branch
     // and the task's activity dot freezes on whatever it was last showing.
-    if (!rec.isDirectSpawn) continue;
-    const result = writeHookSettings(rec.cwd, id);
+    // Foreign-session attach clients (taskId null) own no settings file either.
+    if (!rec.isDirectSpawn || !rec.taskId) continue;
+    targets.set(rec.taskId, rec.cwd);
+  }
+  try {
+    for (const task of DatabaseService.getTasksWithSessions()) {
+      if (!task.archivedAt && !targets.has(task.id)) targets.set(task.id, task.path);
+    }
+  } catch (err) {
+    console.error('[refreshActivePtyHooks] task lookup failed:', err);
+  }
+  for (const [taskId, cwd] of targets) {
+    const result = writeHookSettings(cwd, taskId);
     if (!result.ok) {
       failures.push({ settingsPath: result.settingsPath, error: result.error });
     }
@@ -178,18 +182,6 @@ export function setDesktopNotification(opts: { enabled: boolean }): void {
 
 export function hasPty(id: string): boolean {
   return ptys.has(id);
-}
-
-export function setClaudeEnvVars(vars: Record<string, string>): void {
-  claudeEnvVars = vars;
-}
-
-export function setSyncShellEnv(enabled: boolean): void {
-  syncShellEnv = enabled;
-}
-
-export function setUltracode(enabled: boolean): void {
-  ultracode = enabled;
 }
 
 // Lazy-load node-pty to avoid native binding issues at startup
@@ -215,275 +207,101 @@ function getPty() {
 import { createBannerFilter } from './bannerFilter';
 import { remoteControlService } from './remoteControlService';
 
-/**
- * Build environment for direct CLI spawn.
- * When syncShellEnv is off (default), uses a minimal set for fast, predictable spawns.
- * When on, inherits the full parent process.env as a base.
- */
-function buildDirectEnv(isDark: boolean, cwd?: string): Record<string, string> {
-  const isWin = process.platform === 'win32';
-  const base: Record<string, string> = syncShellEnv
-    ? stripHostTerminalEnv(
-        Object.fromEntries(
-          Object.entries(process.env).filter((e): e is [string, string] => !!e[1]),
-        ),
-      )
-    : {};
-
-  // rtk's rewrite output invokes the bare name `rtk`; when the binary is
-  // Dash-managed (userData/bin), prepend that dir so the rewrite resolves.
-  const rtkBinDir = RtkService.getManagedBinDirForPath();
-  const pathSep = isWin ? ';' : ':';
-  const basePath = process.env.PATH || '';
-  const mergedPath = rtkBinDir ? prependUnique(rtkBinDir, basePath, pathSep) : basePath;
-
-  const env: Record<string, string> = {
-    ...base,
-    TERM_PROGRAM: 'dash',
-    HOME: os.homedir(),
-    PATH: mergedPath,
-    // Tell CLI apps about terminal background (rxvt convention)
-    // Format: "fg;bg" where higher values = lighter colors
-    COLORFGBG: isDark ? '15;0' : '0;15',
-  };
-
-  if (isWin) {
-    // Windows requires system env vars for DNS, credential storage, and Node.js.
-    // Includes both casings of SystemRoot since some processes look for one or
-    // the other (cmd.exe sets SystemRoot, PowerShell sees SYSTEMROOT in env).
-    env.USERNAME = process.env.USERNAME || os.userInfo().username;
-    const winVars = [
-      'APPDATA',
-      'LOCALAPPDATA',
-      'USERPROFILE',
-      'TEMP',
-      'TMP',
-      'SystemRoot',
-      'SYSTEMROOT',
-      'SystemDrive',
-      'WINDIR',
-      'COMSPEC',
-      'PATHEXT',
-      'COMPUTERNAME',
-      'USERDOMAIN',
-      'ProgramFiles',
-    ];
-    for (const key of winVars) {
-      if (process.env[key]) env[key] = process.env[key]!;
-    }
-  } else {
-    env.TERM = 'xterm-256color';
-    env.COLORTERM = 'truecolor';
-    env.USER = os.userInfo().username;
+function samePath(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return false;
   }
-
-  if (!syncShellEnv) {
-    // Auth passthrough — only needed when not inheriting full env
-    const authVars = [
-      'ANTHROPIC_API_KEY',
-      'GH_TOKEN',
-      'GITHUB_TOKEN',
-      'HTTP_PROXY',
-      'HTTPS_PROXY',
-      'NO_PROXY',
-      'http_proxy',
-      'https_proxy',
-      'no_proxy',
-    ];
-
-    for (const key of authVars) {
-      if (process.env[key]) {
-        env[key] = process.env[key]!;
-      }
-    }
-  }
-
-  // Merge user-configured environment variables from settings,
-  // preventing overrides of internal keys that would break spawned processes.
-  for (const [key, value] of Object.entries(claudeEnvVars)) {
-    if (!RESERVED_ENV_KEYS.has(key)) {
-      env[key] = value;
-    }
-  }
-
-  // Merge per-task port env vars (FRONTEND_PORT=…, etc) so commands run by
-  // Claude resolve the same host port the user sees in the ports panel.
-  // After user settings so a project never accidentally clobbers an allocated
-  // port; before the CLAUDE_CODE_NO_FLICKER line so reserved-key checks above
-  // would still apply if a user declared one in .dash/ports.json (the schema
-  // enforces an allowlist regex; the RESERVED_ENV_KEYS list is a defense in
-  // depth not really expected to fire here).
-  if (cwd) {
-    for (const [key, value] of Object.entries(WorkspacePortsRuntime.getEnvForWorktree(cwd))) {
-      if (!RESERVED_ENV_KEYS.has(key)) env[key] = value;
-    }
-  }
-
-  // Disable Claude Code's built-in viewport scrolling — Dash uses its own terminal viewport
-  env.CLAUDE_CODE_NO_FLICKER = '1';
-
-  // The HookServer port for this Dash session. ptyHookSettings writes hooks as
-  // guarded curl commands that read $DASH_HOOK_PORT at runtime: present here →
-  // they reach Dash; absent (a session the user launched outside Dash) → the
-  // `[ -n … ]` guard makes them no-op instead of erroring with ECONNREFUSED.
-  // Set last so it wins over any inherited value; only when the server is bound
-  // (port 0 = not started — leaving the var unset keeps the guard honest).
-  if (hookServer.port !== 0) {
-    env.DASH_HOOK_PORT = String(hookServer.port);
-  }
-
-  return env;
 }
 
 /**
- * Prepend `dir` to a path-like string, but only if it isn't already there
- * (case-sensitive on Unix, case-sensitive on Windows is wrong but matches
- * what users actually do). Used when injecting Dash-managed binary
- * directories into the spawned process's PATH.
+ * Make sure the task has a live job under the supervisor and return its id.
+ * Dispatches (`claude --bg`) when the task has none yet, when the supervisor
+ * no longer lists the recorded job (`claude rm`, forgotten after a machine
+ * reset) or when the job is bound to another directory (worktree moved while
+ * a job existed). A dispatch resumes the task's recorded session, or — for a
+ * task from before the supervisor — the newest transcript under its current
+ * and pre-migration paths, so the conversation carries over.
  */
-function prependUnique(dir: string, basePath: string, sep: string): string {
-  if (!basePath) return dir;
-  const parts = basePath.split(sep);
-  if (parts.includes(dir)) return basePath;
-  return `${dir}${sep}${basePath}`;
-}
-
-/**
- * Spawn Claude CLI directly (fast path, bypasses shell config).
- */
-/**
- * Build the `claude` CLI args. Pure so the resume/name/permission policy is
- * unit-testable without spawning. Two load-bearing rules:
- *  - `--resume <id>` and `--name` are mutually exclusive. `--name` is a
- *    fresh-session display label (shown in `/resume` + the terminal title);
- *    combining it with `--resume` is undocumented (rename? ignore? new
- *    session?), and resume already targets the right session by id.
- *  - the initial prompt, when present, is always the LAST positional — CC
- *    auto-submits it once the trust-this-directory gate clears.
- */
-export function buildClaudeArgs(opts: {
-  resumeSessionId: string | null;
-  name?: string;
-  permissionMode?: PermissionMode;
-  /** Model alias (opus|sonnet|haiku|fable). 'default'/undefined → no --model. */
-  model?: TaskModel;
-  initialPrompt?: string;
-}): string[] {
-  const args: string[] = [];
-  if (opts.resumeSessionId) {
-    args.push('--resume', opts.resumeSessionId);
-  } else if (opts.name) {
-    args.push('--name', opts.name);
-  }
-  if (opts.permissionMode === 'acceptEdits') {
-    args.push('--permission-mode', 'acceptEdits');
-  } else if (opts.permissionMode === 'bypassPermissions') {
-    args.push('--dangerously-skip-permissions');
-  }
-  // Pin the starting model when the user chose a non-default one. 'default' omits
-  // the flag so the user's own Claude Code config decides. Orthogonal to
-  // resume/name, so it applies to both fresh and resumed sessions.
-  if (opts.model && opts.model !== 'default') {
-    args.push('--model', opts.model);
-  }
-  // ultracode is session-scoped; re-apply on every spawn so the user's toggle
-  // effectively sticks across the sessions Dash launches. Must precede the
-  // positional prompt below.
-  if (ultracode) {
-    args.push('--settings', JSON.stringify({ ultracode: true }));
-  }
-  if (opts.initialPrompt) {
-    args.push(opts.initialPrompt);
-  }
-  return args;
-}
-
-export async function startDirectPty(options: {
+async function ensureTaskSession(opts: {
   id: string;
+  cwd: string;
+  name: string;
+  permissionMode?: PermissionMode;
+  model?: TaskModel;
+  previousPath?: string | null;
+  jobId: string | null;
+  sessionId: string | null;
+  env: Record<string, string>;
+}): Promise<string> {
+  let resumeSessionId = opts.sessionId;
+  if (opts.jobId) {
+    let row;
+    try {
+      row = await supervisorService.find(opts.jobId);
+    } catch (err) {
+      console.warn(
+        `[ptyManager] supervisor listing failed; assuming job ${opts.jobId} is live`,
+        err,
+      );
+      return opts.jobId;
+    }
+    if (row && samePath(row.cwd, opts.cwd)) return opts.jobId;
+    if (row) {
+      // Job still bound to the old cwd — the supervisor would refuse a resume
+      // ("working directory no longer exists") and queue the prompt. Drop it.
+      resumeSessionId = row.sessionId ?? resumeSessionId;
+      await supervisorService.stop(opts.jobId).catch(() => {});
+      await supervisorService.remove(opts.jobId).catch(() => {});
+    }
+  }
+  if (!resumeSessionId) {
+    resumeSessionId = findLatestSessionId(opts.cwd, opts.previousPath);
+  }
+  const prompt = consumeInitialPrompt(opts.id);
+  const { jobId, sessionId } = await supervisorService.dispatch({
+    cwd: opts.cwd,
+    name: opts.name,
+    permissionMode: opts.permissionMode,
+    model: opts.model,
+    prompt,
+    resumeSessionId,
+    env: opts.env,
+  });
+  DatabaseService.setTaskSession(opts.id, { jobId, sessionId: sessionId ?? resumeSessionId });
+  return jobId;
+}
+
+/**
+ * Spawn a `claude attach <jobId>` client in a PTY. The session process
+ * belongs to the supervisor; this client only renders it, so killing the PTY
+ * (task switch, renderer reload, quit) never touches the session.
+ */
+function spawnAttach(options: {
+  id: string;
+  jobId: string;
   cwd: string;
   cols: number;
   rows: number;
-  permissionMode?: PermissionMode;
-  /** Starting model → `claude --model <alias>`. 'default'/undefined omits it. */
-  model?: TaskModel;
-  isDark?: boolean;
-  /** Task name → `claude --name` on a fresh spawn (recognizable in /resume). */
-  name?: string;
-  /** Pre-migration worktree path (Task.previousPath); its transcript dir is
-   *  searched too when picking the session to resume. */
-  previousPath?: string | null;
+  env: Record<string, string>;
+  claudePath: string;
+  taskId: string | null;
   sender?: WebContents;
-}): Promise<{
-  reattached: boolean;
-  isDirectSpawn: boolean;
-  serializedState?: string;
-}> {
-  // Re-attach to existing PTY (e.g., after renderer reload)
-  const existing = ptys.get(options.id);
-  if (existing && !existing.isDirectSpawn) {
-    // Shell PTY exists for this ID, but we need Claude — kill it first
-    try {
-      existing.proc.kill();
-    } catch {
-      /* already dead */
-    }
-    persistAndDisposeMirror(options.id, existing);
-    ptys.delete(options.id);
-  } else if (existing) {
-    // Serialize BEFORE claiming the owner: a chunk arriving mid-serialize
-    // lands in the mirror only (next output repaints it) — never duplicated.
-    const serializedState = existing.mirror ? await existing.mirror.serialize() : undefined;
-    existing.owner = options.sender || null;
-    return { reattached: true, isDirectSpawn: true, serializedState };
-  }
-
-  const claudePath = await findClaudePath();
-
-  if (!claudePath) {
-    throw new Error('Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code');
-  }
-
-  // Resume by the exact newest session id rather than `--continue`. Both rest
-  // on a load-bearing invariant: each task has a unique cwd (worktree tasks by
-  // construction; non-worktree tasks capped at one per project in
-  // DatabaseService.saveTask / restoreTask, UI-gated in TaskModal). Pinning the
-  // id we resolve ourselves — the same newest-mtime file SessionWatcherService
-  // tails — makes the resumed session deterministically the one Dash is showing,
-  // instead of delegating the pick to `--continue`'s undocumented selector. It
-  // still follows /clear and /compact forks (each is a newer file).
-  //
-  // DO NOT relax the one-non-worktree-task cap without revisiting this; see git
-  // history at 32bcdb6 for why the old SessionStart-hook pinning was removed.
-  const resumeSessionId = findLatestSessionId(options.cwd, options.previousPath);
-
-  // Pre-loaded prompt (the inlined ports-setup body). Only present for the
-  // ports-migrate flow today; no-op for every other spawn. buildClaudeArgs
-  // places it last (CC auto-submits it after the trust gate clears).
-  const initialPrompt = consumeInitialPrompt(options.id);
-
-  const args = buildClaudeArgs({
-    resumeSessionId,
-    name: options.name,
-    permissionMode: options.permissionMode,
-    model: options.model,
-    initialPrompt,
-  });
-
-  const env = buildDirectEnv(options.isDark ?? true, options.cwd);
-
-  writeHookSettings(options.cwd, options.id);
-
+}): PtyRecord {
   const pty = getPty();
+  const args = ['attach', options.jobId];
   // On Windows, .cmd files must be invoked through cmd.exe
-  const spawnFile = process.platform === 'win32' ? 'cmd.exe' : claudePath;
-  const spawnArgs: string[] = process.platform === 'win32' ? ['/c', claudePath, ...args] : args;
+  const spawnFile = process.platform === 'win32' ? 'cmd.exe' : options.claudePath;
+  const spawnArgs = process.platform === 'win32' ? ['/c', options.claudePath, ...args] : args;
 
   const proc = pty.spawn(spawnFile, spawnArgs, {
     name: 'xterm-256color',
     cols: options.cols,
     rows: options.rows,
     cwd: options.cwd,
-    env,
+    env: options.env,
   });
 
   const record: PtyRecord = {
@@ -492,19 +310,15 @@ export async function startDirectPty(options: {
     isDirectSpawn: true,
     owner: options.sender || null,
     kind: 'agent',
-    taskId: options.id,
+    taskId: options.taskId,
     featureId: null,
-    mirror: new TerminalMirror(options.cols, options.rows),
+    jobId: options.jobId,
+    mirror: null,
   };
-
   ptys.set(options.id, record);
-  activityMonitor.register(options.id, proc.pid);
 
   // Forward output to renderer, replacing the Claude logo with "7" art.
-  // The mirror receives the same filtered stream the renderer renders, so
-  // its serialized state matches what a reattaching xterm should show.
   const bannerFilter = createBannerFilter((filtered: string) => {
-    record.mirror?.write(filtered);
     if (record.owner && !record.owner.isDestroyed()) {
       record.owner.send(`pty:data:${options.id}`, filtered);
     }
@@ -512,27 +326,175 @@ export async function startDirectPty(options: {
 
   proc.onData((data: string) => {
     bannerFilter(data);
-    activityMonitor.noteData(options.id);
+    if (options.taskId) activityMonitor.noteData(options.taskId);
     remoteControlService.onPtyData(options.id, data);
   });
 
   proc.onExit(({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-    // Skip if this PTY was replaced by a new spawn (kill+restart on reattach)
+    // Skip if this PTY was replaced by a new attach (kill+restart on reattach)
     if (ptys.get(options.id) !== record) return;
-    activityMonitor.unregister(options.id);
+    // The attach client exited (Esc out of agent view, Ctrl+Z, or the session
+    // process went away). The session and its activity entry live on; only
+    // the client-side registrations go.
     remoteControlService.unregister(options.id);
-    contextUsageService.unregister(options.id);
     if (record.owner && !record.owner.isDestroyed()) {
       record.owner.send(`pty:exit:${options.id}`, { exitCode, signal });
     }
-    persistAndDisposeMirror(options.id, record);
     ptys.delete(options.id);
   });
 
-  return {
-    reattached: false,
-    isDirectSpawn: true,
-  };
+  return record;
+}
+
+/**
+ * Open the task's session in a PTY: dispatch it under the supervisor when it
+ * has none, then `claude attach`. A second call for the same id (renderer
+ * reload) replaces the attach client — the fresh one repaints the screen, so
+ * there is no mirror state to hand back.
+ */
+export async function startDirectPty(options: {
+  id: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  permissionMode?: PermissionMode;
+  /** Starting model → `claude --model <alias>` on dispatch. 'default'/undefined omits it. */
+  model?: TaskModel;
+  isDark?: boolean;
+  /** Task name → `claude --bg --name`. */
+  name?: string;
+  /** Pre-migration worktree path (Task.previousPath); its transcript dir is
+   *  searched too when picking the session to resume on the first dispatch. */
+  previousPath?: string | null;
+  /** Recorded supervisor job/session (Task.jobId / Task.sessionId). */
+  jobId?: string | null;
+  sessionId?: string | null;
+  sender?: WebContents;
+}): Promise<{
+  reattached: boolean;
+  isDirectSpawn: boolean;
+  jobId: string;
+}> {
+  const existing = ptys.get(options.id);
+  if (existing) {
+    // A shell PTY at the task id (stray) or a previous attach client: either
+    // way the new attach replaces it.
+    await killPtyInternal(options.id);
+  }
+
+  const claudePath = await findClaudePath();
+  if (!claudePath) {
+    throw new Error('Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code');
+  }
+
+  const env = buildClaudeEnv(options.isDark ?? true, options.cwd);
+
+  // Before dispatch, so the session's first turn already reports.
+  writeHookSettings(options.cwd, options.id);
+  activityMonitor.ensure(options.id);
+
+  const jobId = await ensureTaskSession({
+    id: options.id,
+    cwd: options.cwd,
+    name: options.name ?? options.id,
+    permissionMode: options.permissionMode,
+    model: options.model,
+    previousPath: options.previousPath,
+    jobId: options.jobId ?? null,
+    sessionId: options.sessionId ?? null,
+    env,
+  });
+
+  spawnAttach({
+    id: options.id,
+    jobId,
+    cwd: options.cwd,
+    cols: options.cols,
+    rows: options.rows,
+    env,
+    claudePath,
+    taskId: options.id,
+    sender: options.sender,
+  });
+
+  return { reattached: false, isDirectSpawn: true, jobId };
+}
+
+/**
+ * Attach to a session that belongs to no task (started outside Dash). No
+ * hooks are written — the worktree's settings file is not Dash's to edit.
+ */
+export async function startSessionAttach(options: {
+  jobId: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  isDark?: boolean;
+  sender?: WebContents;
+}): Promise<{ id: string }> {
+  const id = `${FOREIGN_SESSION_PTY_PREFIX}${options.jobId}`;
+  if (ptys.has(id)) await killPtyInternal(id);
+  const claudePath = await findClaudePath();
+  if (!claudePath) {
+    throw new Error('Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code');
+  }
+  spawnAttach({
+    id,
+    jobId: options.jobId,
+    cwd: options.cwd,
+    cols: options.cols,
+    rows: options.rows,
+    env: buildClaudeEnv(options.isDark ?? true),
+    claudePath,
+    taskId: null,
+    sender: options.sender,
+  });
+  return { id };
+}
+
+/** Stop the task's session (`claude stop`); the attach client goes with it. */
+export async function stopTaskSession(taskId: string): Promise<void> {
+  await killPtyInternal(taskId);
+  const task = DatabaseService.getTask(taskId);
+  if (!task?.jobId) return;
+  await supervisorService.stop(task.jobId);
+  DatabaseService.markTaskSessionStopped(taskId);
+}
+
+/**
+ * Forget the task's session (`claude stop` + `claude rm`; the transcript is
+ * kept). Task delete uses this; the next open of an archived-then-restored
+ * task starts a fresh job that resumes the recorded session id.
+ */
+export async function removeTaskSession(taskId: string): Promise<void> {
+  await killPtyInternal(taskId);
+  const task = DatabaseService.getTask(taskId);
+  activityMonitor.unregister(taskId);
+  if (!task?.jobId) return;
+  await supervisorService.stop(task.jobId).catch(() => {});
+  await supervisorService.remove(task.jobId);
+  DatabaseService.setTaskSession(taskId, { jobId: null, sessionId: task.sessionId });
+}
+
+/**
+ * Re-dispatch the task's session so it picks up a changed environment
+ * (ports, user env vars, ultracode): stop + rm the current job, then the
+ * next startDirectPty resumes the same session id in a fresh job. The
+ * renderer's restart path calls this before re-attaching.
+ */
+export async function restartTaskSession(taskId: string): Promise<void> {
+  await killPtyInternal(taskId);
+  const task = DatabaseService.getTask(taskId);
+  if (!task?.jobId) return;
+  let sessionId = task.sessionId;
+  try {
+    sessionId = (await supervisorService.find(task.jobId))?.sessionId ?? sessionId;
+  } catch {
+    // Listing unavailable — the recorded id is the best we have.
+  }
+  await supervisorService.stop(task.jobId).catch(() => {});
+  await supervisorService.remove(task.jobId).catch(() => {});
+  DatabaseService.setTaskSession(taskId, { jobId: null, sessionId });
 }
 
 /**
@@ -619,6 +581,7 @@ export async function startPty(options: {
     kind: 'shell',
     taskId: shellTaskId,
     featureId: null,
+    jobId: null,
     mirror: new TerminalMirror(options.cols, options.rows),
   };
 
@@ -690,12 +653,10 @@ const GRACEFUL_KILL_TIMEOUT_MS = 3000;
 /**
  * Gracefully terminate a pty's child process: send SIGTERM so it can flush and
  * exit cleanly, then escalate to SIGKILL only if it overstays the grace window.
- * Resolves once the process is gone (or was already dead).
- *
- * node-pty's bare `kill()` sends SIGHUP, which Claude Code does not trap — so
- * its in-memory session tail (the last several turns) was lost on every
- * refresh/quit, and no `--resume`/`--continue` could recover what never
- * reached the jsonl. SIGTERM + a wait gives Claude the chance to persist first.
+ * Resolves once the process is gone (or was already dead). Shells get the
+ * window to run their exit hooks; an agent PTY is only a `claude attach`
+ * client, so the session keeps writing its transcript under the supervisor
+ * regardless of how the client dies.
  */
 type KillableProc = {
   kill: (signal?: string) => void;
@@ -743,12 +704,16 @@ function gracefulKillProc(proc: KillableProc, timeoutMs = GRACEFUL_KILL_TIMEOUT_
 }
 
 /** Detach a record from all registries and persist its mirror (shared by the
- *  kill paths). The map delete makes the spawn-time onExit handler a no-op. */
+ *  kill paths). The map delete makes the spawn-time onExit handler a no-op.
+ *  Activity and context usage are keyed by task and describe the session,
+ *  which outlives its attach client, so they stay for agent PTYs. */
 function teardownRecord(id: string, record: PtyRecord): void {
   ptys.delete(id);
-  activityMonitor.unregister(id);
+  if (record.kind !== 'agent') {
+    activityMonitor.unregister(id);
+    contextUsageService.unregister(id);
+  }
   remoteControlService.unregister(id);
-  contextUsageService.unregister(id);
   // Persist before killing — restart() relies on the snapshot for visual
   // context when it respawns into the same id.
   persistAndDisposeMirror(id, record);
@@ -772,9 +737,8 @@ export function killPty(id: string): void {
 
 /**
  * Kill a specific PTY and resolve once it has actually exited (or the grace
- * window elapsed). The renderer's reattach/restart paths await this before
- * respawning so the new `claude --resume` process never races the dying one
- * for the session jsonl (a brief two-writer overlap could corrupt the tail).
+ * window elapsed). Callers that respawn into the same id await this so the
+ * new process never races the dying one.
  */
 export function killPtyAwait(id: string): Promise<void> {
   return killPtyInternal(id);
@@ -782,8 +746,9 @@ export function killPtyAwait(id: string): Promise<void> {
 
 /**
  * Kill all PTYs (on app quit). Awaits every child's graceful exit in parallel
- * so the bound is ~one grace window, not the sum — the before-quit handler
- * awaits this so the app doesn't exit before Claude flushes its session.
+ * so the bound is ~one grace window, not the sum. Task sessions keep running
+ * under the supervisor unless `stopSessionsOnQuit` is on, in which case each
+ * one gets a `claude stop` first (best effort, bounded by the quit safety net).
  */
 export async function killAll(): Promise<void> {
   const pending: Promise<void>[] = [];
@@ -794,6 +759,22 @@ export async function killAll(): Promise<void> {
   ptys.clear();
   // Bulk cleanup — don't rely on onExit during shutdown
   activityMonitor.stop();
+  if (stopSessionsOnQuit) {
+    try {
+      for (const task of DatabaseService.getTasksWithSessions()) {
+        if (task.jobId && !task.archivedAt) {
+          pending.push(
+            supervisorService.stop(task.jobId).then(
+              () => DatabaseService.markTaskSessionStopped(task.id),
+              (err) => console.warn(`[ptyManager] stop on quit failed for ${task.name}:`, err),
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[ptyManager] stop-on-quit lookup failed:', err);
+    }
+  }
   await Promise.all(pending);
 }
 
@@ -880,6 +861,7 @@ export async function startCommandPty(options: {
     kind: options.kind ?? 'tui',
     taskId: options.taskId,
     featureId: options.featureId,
+    jobId: null,
     mirror: new TerminalMirror(options.cols, options.rows),
   };
 
@@ -933,6 +915,7 @@ export function __registerForTest(
     kind: rec.kind,
     taskId: rec.taskId,
     featureId: rec.featureId,
+    jobId: null,
     mirror: null,
   });
 }

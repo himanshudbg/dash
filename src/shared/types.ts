@@ -81,6 +81,13 @@ export interface Task {
    *  when the task was never moved. Claude transcripts written before the move
    *  live under this path's encoded dir. */
   previousPath: string | null;
+  /** Short id of the task's session under Claude Code's supervisor (`claude
+   *  agents --json` `id`); null until the first dispatch. */
+  jobId: string | null;
+  /** Claude session UUID of that job; used for `--bg --resume` re-dispatches. */
+  sessionId: string | null;
+  /** Set when Dash or the supervisor stopped the session (archive, idle stop). */
+  sessionStoppedAt: string | null;
   archivedAt: string | null;
   sortOrder: number;
   totalTokens: number;
@@ -258,7 +265,9 @@ export interface UsageThresholds {
 
 // ── Activity Types ──────────────────────────────────────────
 
-export type ActivityState = 'busy' | 'idle' | 'waiting' | 'error';
+/** `stopped`: the supervisor parked the session (idle timer, `claude stop`,
+ *  machine restart); attaching resumes it. */
+export type ActivityState = 'busy' | 'idle' | 'waiting' | 'error' | 'stopped';
 
 /** Human-readable label for the current tool, derived from PreToolUse hook data. */
 export interface ToolActivity {
@@ -270,7 +279,7 @@ export interface ToolActivity {
 
 /** Error info from StopFailure hook. */
 export interface ActivityError {
-  type: 'rate_limit' | 'auth_error' | 'billing_error' | 'unknown';
+  type: 'rate_limit' | 'auth_error' | 'billing_error' | 'supervisor' | 'unknown';
   message?: string;
 }
 
@@ -283,6 +292,33 @@ export interface ActivityInfo {
   error?: ActivityError;
   /** True while Claude Code is compacting context. */
   compacting?: boolean;
+  /** Short reason shown with the `stopped` dot ("Session removed", …). */
+  detail?: string;
+}
+
+// ── Claude Code session supervisor ─────────────────────────────
+
+/** `state` column of `claude agents --json`. */
+export type SupervisorState = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
+/** `status` column of `claude agents --json`, present while the process is alive. */
+export type SupervisorStatus = 'busy' | 'waiting' | 'idle';
+
+/** One row of `claude agents --json`. Unknown fields are dropped; fields the
+ *  research-preview CLI may rename degrade to `undefined`, never throw. */
+export interface SupervisorSession {
+  /** Short job id (first 8 hex chars of `sessionId`); absent for interactive sessions. */
+  id?: string;
+  sessionId?: string;
+  name?: string;
+  cwd: string;
+  kind: 'interactive' | 'background';
+  startedAt: number;
+  state?: SupervisorState;
+  status?: SupervisorStatus;
+  waitingFor?: string;
+  pid?: number;
+  /** Model-written one-line summary of what the session is doing. */
+  detail?: string;
 }
 
 // ── Branch Types ─────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FolderGit2, Loader2, ArrowRight, AlertCircle, Check } from 'lucide-react';
+import { X, FolderGit2, Loader2, AlertCircle, Check } from 'lucide-react';
 import type { WorktreeMigrationProject, WorktreeMigrationResult } from '../../../shared/types';
 import { Modal, useModalClose } from '../ui/Modal';
 
@@ -130,11 +130,12 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                       {project.tasks.length} task{project.tasks.length === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5 text-[10.5px] font-mono text-foreground/50 min-w-0">
-                    <span className="truncate">{project.legacyDir}</span>
-                    <ArrowRight size={11} strokeWidth={2} className="shrink-0" />
-                    <span className="truncate">{project.targetDir}</span>
-                  </div>
+                  <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-[10.5px] font-mono text-foreground/50">
+                    <dt className="text-muted-foreground/60 select-none">from</dt>
+                    <dd className="break-all">{project.legacyDir}</dd>
+                    <dt className="text-muted-foreground/60 select-none">to</dt>
+                    <dd className="break-all">{project.targetDir}</dd>
+                  </dl>
                   <ul className="mt-2 space-y-1">
                     {project.tasks.map((t) => (
                       <li

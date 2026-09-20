@@ -4,6 +4,14 @@ import * as path from 'path';
 // 1. Set app name BEFORE any app.getPath() calls
 app.setName('Dash');
 
+// Dev/testing escape hatch: point userData (DB, snapshots, hook-port file and
+// the single-instance lock) at another directory so a second Dash — e.g. a
+// checkout under development — can run beside the installed one without
+// sharing its database.
+if (process.env.DASH_USER_DATA_DIR) {
+  app.setPath('userData', path.resolve(process.env.DASH_USER_DATA_DIR));
+}
+
 // 2. Install path aliases for main process
 // @shared/* → dist/main/shared/*
 // @/* → dist/main/main/*

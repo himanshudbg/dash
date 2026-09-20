@@ -103,10 +103,19 @@ void app.whenReady().then(async () => {
   const { DatabaseService } = await import('./services/DatabaseService');
   DatabaseService.initialize();
 
-  // Start hook server (must be ready before any PTY spawns)
+  // Start hook server (must be ready before any PTY spawns). Hooks are keyed
+  // by task id and fire for a task's session whether or not an attach client
+  // is open, so a task with a recorded supervisor job is always accepted.
   const { hookServer } = await import('./services/HookServer');
   const { hasPty } = await import('./services/ptyManager');
-  hookServer.setPtyValidator(hasPty);
+  const { activityMonitor: activity } = await import('./services/ActivityMonitor');
+  hookServer.setPtyValidator((id) => {
+    if (hasPty(id) || activity.has(id)) return true;
+    const task = DatabaseService.getTask(id);
+    if (!task?.jobId || task.archivedAt) return false;
+    activity.ensure(id);
+    return true;
+  });
   await hookServer.start();
 
   // Register IPC handlers
@@ -132,6 +141,12 @@ void app.whenReady().then(async () => {
   // Start activity monitor — must happen after window creation
   const { activityMonitor } = await import('./services/ActivityMonitor');
   activityMonitor.start(mainWindow.webContents);
+
+  // Supervisor reconcile loop: `claude agents --json` is the truth for task
+  // sessions Dash was not around to see (restart, idle stop, sleep).
+  const { supervisorService } = await import('./services/SupervisorService');
+  supervisorService.setSender(mainWindow.webContents);
+  supervisorService.startPolling();
 
   // Remote control service needs a sender for state change events
   const { remoteControlService } = await import('./services/remoteControlService');
@@ -257,6 +272,8 @@ app.on('activate', () => {
       mainWindow = createWindow();
       const { activityMonitor } = await import('./services/ActivityMonitor');
       activityMonitor.start(mainWindow.webContents);
+      const { supervisorService } = await import('./services/SupervisorService');
+      supervisorService.setSender(mainWindow.webContents);
       const { remoteControlService } = await import('./services/remoteControlService');
       remoteControlService.setSender(mainWindow.webContents);
       const { RtkService } = await import('./services/RtkService');
@@ -281,8 +298,8 @@ let quitCleanupComplete = false;
 app.on('before-quit', (event) => {
   // Second pass (after cleanup re-issues app.quit()): let the quit proceed.
   if (quitCleanupComplete) return;
-  // Hold the quit so graceful PTY shutdown (killAll → SIGTERM → flush) can
-  // complete — otherwise the app exits before Claude persists its session tail.
+  // Hold the quit so the attach clients and shells can exit gracefully (and,
+  // with stopSessionsOnQuit, the supervisor gets its `claude stop` calls).
   event.preventDefault();
 
   // Hard safety net: never let a hung cleanup wedge the quit. app.exit bypasses
@@ -318,8 +335,16 @@ app.on('before-quit', (event) => {
       // Best effort
     }
 
-    // Kill all PTYs (also stops activity monitor). Awaited so each Claude
-    // child gets its SIGTERM flush window before the app exits.
+    // Stop the supervisor reconcile loop before the PTYs go.
+    try {
+      const { supervisorService } = await import('./services/SupervisorService');
+      supervisorService.stopPolling();
+    } catch {
+      // Best effort
+    }
+
+    // Kill all PTYs (also stops activity monitor). Task sessions keep running
+    // under the supervisor; only the attach clients and shells exit here.
     try {
       const { killAll } = await import('./services/ptyManager');
       await killAll();
@@ -339,14 +364,6 @@ app.on('before-quit', (event) => {
     try {
       const { stopAll } = await import('./services/FileWatcherService');
       stopAll();
-    } catch {
-      // Best effort
-    }
-
-    // Stop all session watchers
-    try {
-      const { stopAll: stopSessionWatchers } = await import('./services/SessionWatcherService');
-      stopSessionWatchers();
     } catch {
       // Best effort
     }

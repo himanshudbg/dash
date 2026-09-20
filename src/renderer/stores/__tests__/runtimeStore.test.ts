@@ -171,6 +171,65 @@ describe('runtimeStore.init — activity', () => {
     expect(setUnseenTaskIds).toHaveBeenCalled();
     cleanup();
   });
+
+  it('treats a supervisor-stopped session as rested, and busy→stopped as not done', async () => {
+    const { useRuntime, useProjects, useSettings } = await freshStores();
+    useProjects.setState({ activeTaskId: 'active' });
+    const setUnseenTaskIds = vi.fn();
+    useSettings.setState({ notificationSound: 'default', setUnseenTaskIds } as never);
+    const cleanup = useRuntime.getState().init();
+
+    activityCb!({ x: { state: 'stopped' } }); // parked by the supervisor: counts as rested
+    activityCb!({ x: { state: 'busy' } });
+    vi.advanceTimersByTime(4000);
+    activityCb!({ x: { state: 'stopped' } }); // idle-stop mid-flight is not "done"
+    expect(playNotificationSound).not.toHaveBeenCalled();
+
+    activityCb!({ x: { state: 'busy' } });
+    vi.advanceTimersByTime(4000);
+    activityCb!({ x: { state: 'idle' } });
+    expect(playNotificationSound).toHaveBeenCalledWith('default');
+    cleanup();
+  });
+});
+
+describe('runtimeStore.init — supervisor sessions', () => {
+  let api: ReturnType<typeof makeElectronApiMock>;
+  let listCb: ((rows: unknown) => void) | null;
+  beforeEach(() => {
+    listCb = null;
+    api = makeElectronApiMock();
+    api.onSessionList = vi.fn((cb: (rows: unknown) => void) => {
+      listCb = cb;
+      return vi.fn();
+    });
+    installWindow(api);
+  });
+  afterEach(() => resetWindow());
+
+  it('seeds from sessionList and follows pushed listings', async () => {
+    const row = { id: 'abcd1234', cwd: '/p/a', kind: 'background', startedAt: 1 };
+    api.sessionList = vi.fn(() => Promise.resolve({ success: true, data: [row] }));
+    const { useRuntime } = await freshStores();
+    const cleanup = useRuntime.getState().init();
+    await Promise.resolve();
+    expect(useRuntime.getState().supervisorSessions).toEqual([row]);
+    listCb!([]);
+    expect(useRuntime.getState().supervisorSessions).toEqual([]);
+    cleanup();
+  });
+
+  it('adoptSession reloads the project tasks and returns the task', async () => {
+    const adopted = task('t9', 'a', { jobId: 'abcd1234' });
+    api.sessionAdopt = vi.fn(() => Promise.resolve({ success: true, data: adopted }));
+    api.getTasks = vi.fn(() => Promise.resolve({ success: true, data: [adopted] }));
+    const { useRuntime, useProjects } = await freshStores();
+    useProjects.setState({ projects: [proj('a')] });
+    const result = await useRuntime.getState().adoptSession('a', 'abcd1234');
+    expect(result).toEqual(adopted);
+    expect(api.sessionAdopt).toHaveBeenCalledWith({ projectId: 'a', jobId: 'abcd1234' });
+    expect(useProjects.getState().tasksByProject.a).toEqual([adopted]);
+  });
 });
 
 describe('runtimeStore.init — remote control', () => {

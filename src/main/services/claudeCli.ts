@@ -7,8 +7,9 @@ import { encodeProjectPath } from '../utils/jsonlParser';
 
 const execFileAsync = promisify(execFile);
 
-/** Exact-match-only project dir lookup. See SessionWatcherService.findProjectDir
- *  for the rationale (PR #117/#124) and `encodeProjectPath` for the platform rules. */
+/** Exact-match-only project dir lookup (PR #117/#124: a prefix match used to
+ *  pick up sibling projects' transcripts). See `encodeProjectPath` for the
+ *  platform rules. */
 function findClaudeProjectDir(cwd: string): string | null {
   try {
     const projectsDir = path.join(os.homedir(), '.claude', 'projects');
@@ -24,11 +25,9 @@ function findClaudeProjectDir(cwd: string): string | null {
  * Pure selection: given a project dir's entries, return the basename (sans
  * `.jsonl`) of the most-recently-modified session file, or null if none.
  *
- * Newest-mtime is deliberately the same criterion SessionWatcherService uses
- * (`findLatestSessionFile`), so the session we resume is always the exact one
- * Dash is already displaying — and it naturally follows Claude's `/clear` and
- * `/compact` forks (each writes a fresh, newer file) instead of pinning a
- * stale id the way the old SessionStart-hook machinery did (see 32bcdb6).
+ * Newest-mtime follows Claude's `/clear` and `/compact` forks (each writes a
+ * fresh, newer file) instead of pinning a stale id the way the old
+ * SessionStart-hook machinery did (see 32bcdb6).
  */
 export function pickLatestSessionId(
   files: Array<{ name: string; mtimeMs: number }>,
@@ -43,8 +42,10 @@ export function pickLatestSessionId(
 
 /**
  * Resolve the most recent Claude session id for a cwd, or null if Claude has
- * no jsonl history there yet. Used to pin `--resume <id>` instead of the
- * undocumented `--continue` "most recent" guess.
+ * no jsonl history there yet. Used once per task: the first supervisor
+ * dispatch of a task created before Dash recorded session ids passes it as
+ * `--bg --resume <id>` so the conversation carries over; from then on the
+ * task row holds the id (Task.sessionId).
  *
  * `previousPath` is the task's pre-migration worktree location (Task.previousPath).
  * Claude keys transcripts by the cwd a session started in and keeps writing a

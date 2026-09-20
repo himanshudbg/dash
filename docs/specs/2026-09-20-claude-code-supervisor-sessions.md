@@ -1,8 +1,11 @@
 # Plan: run Dash task sessions under Claude Code's session supervisor
 
-Status: spikes run (§4.1), plan adjusted. PR 1 (§6.1 + §6.2: version floor,
-worktree relocation, migration dialog) implemented on
-`claude/dash-cc-session-upgrade-h95ton`; PR 2 (§6.3–§6.10) next.
+Status: implemented on `claude/dash-cc-session-upgrade-h95ton` (v0.16.0) and
+verified by hand against Claude Code 2.1.278 on macOS: PR 1 (§6.1 + §6.2:
+version floor, worktree relocation, migration dialog) and PR 2 (§6.3–§6.10:
+supervisor dispatch/attach, port-file hooks, reconcile, detached card, foreign
+sessions). See `docs/specs/2026-09-20-supervisor-sessions-handoff.md` for what
+was verified, the deviations from this plan, and what is left.
 Written against Dash v0.15.1 and Claude Code 2.1.278 (docs as of 2026-09-20).
 
 ## 1. Decision summary

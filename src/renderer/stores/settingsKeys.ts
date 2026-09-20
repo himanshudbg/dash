@@ -26,6 +26,9 @@ export interface SettingsState {
   desktopNotification: boolean;
   syncShellEnv: boolean;
   ultracode: boolean;
+  /** `claude stop` every task session when Dash quits. Off: sessions keep
+   *  running under Claude Code's supervisor and resume on the next attach. */
+  stopSessionsOnQuit: boolean;
   notificationSound: NotificationSound;
   terminalTheme: string;
   terminalFontFamily: string;
@@ -91,6 +94,7 @@ export const SETTINGS_REGISTRY: RegistryEntry[] = [
   entry('desktopNotification', 'desktopNotification', boolDefaultFalse()),
   entry('syncShellEnv', 'syncShellEnv', boolDefaultFalse()),
   entry('ultracode', 'ultracode', boolDefaultFalse()),
+  entry('stopSessionsOnQuit', 'stopSessionsOnQuit', boolDefaultFalse()),
   entry('notificationSound', 'notificationSound', str('off') as Codec<NotificationSound>),
   entry('terminalTheme', 'terminalTheme', str('default')),
   entry('terminalFontFamily', 'terminalFontFamily', str('system')),

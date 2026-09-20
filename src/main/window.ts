@@ -47,7 +47,9 @@ export function createWindow(): BrowserWindow {
   });
 
   if (isDev) {
-    void mainWindow.loadURL('http://localhost:3000');
+    // DASH_DEV_URL lets a second dev instance point at a Vite server on another
+    // port (Vite picks the next free one when 3000 is taken).
+    void mainWindow.loadURL(process.env.DASH_DEV_URL || 'http://localhost:3000');
     // DevTools is opened on demand (Cmd+Opt+I) rather than auto-opened — an
     // auto-opened DevTools frontend spams the terminal with Chromium's
     // "Autofill.enable wasn't found" CDP error on every boot.

@@ -56,6 +56,16 @@ describe('isDashOwnedHook', () => {
     expect(isDashOwnedHook({ type: 'command', command })).toBe(true);
   });
 
+  it('recognises a brand-stripped command hook that reads the port from the port file ($P)', () => {
+    const cmd =
+      'P=$(cat "/Users/x/Library/Application Support/Dash/hook-port" 2>/dev/null) || exit 0; [ -n "$P" ] || exit 0; ' +
+      "curl -s --max-time 2 -X POST -H 'Content-Type: application/json' " +
+      '-d @- "http://127.0.0.1:$P/hook/busy?ptyId=abc" >/dev/null 2>&1; exit 0';
+    expect(entryIsDashOwned({ matcher: '', hooks: [{ type: 'command', command: cmd }] })).toBe(
+      true,
+    );
+  });
+
   it('recognises a brand-stripped command hook that reads the port from $DASH_HOOK_PORT', () => {
     // Current Dash writes hooks as guarded curl commands whose port is the
     // runtime env var, not a baked number: ".../127.0.0.1:$DASH_HOOK_PORT/hook/…".

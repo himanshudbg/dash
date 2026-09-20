@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('pty:resize', args),
   ptyKill: (id: string) => ipcRenderer.send('pty:kill', id),
   ptyKillAwait: (id: string) => ipcRenderer.invoke('pty:kill-await', id),
+  ptyRestartSession: (taskId: string) => ipcRenderer.invoke('pty:restartSession', taskId),
   ptyListForTask: (
     taskId: string,
     opts?: { kinds?: ('agent' | 'shell' | 'tui')[]; featureId?: string },
@@ -236,6 +237,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('app:setClaudeEnvVars', vars),
   setSyncShellEnv: (enabled: boolean) => ipcRenderer.send('app:setSyncShellEnv', enabled),
   setUltracode: (enabled: boolean) => ipcRenderer.send('app:setUltracode', enabled),
+  setStopSessionsOnQuit: (enabled: boolean) =>
+    ipcRenderer.send('app:setStopSessionsOnQuit', enabled),
   getClaudeAttribution: (projectPath?: string) =>
     ipcRenderer.invoke('app:getClaudeAttribution', projectPath),
 
@@ -490,18 +493,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   extensionsGetRegistrySkillDetail: (args: import('@shared/types').SkillRef) =>
     ipcRenderer.invoke('extensions:getRegistrySkillDetail', args),
 
-  // Session (structured view)
-  sessionWatch: (args: { taskId: string; taskPath: string }) =>
-    ipcRenderer.invoke('session:watch', args),
-  sessionUnwatch: (taskId: string) => ipcRenderer.invoke('session:unwatch', taskId),
-  sessionGetMessages: (taskId: string) => ipcRenderer.invoke('session:getMessages', taskId),
-  onSessionUpdate: (callback: (data: unknown) => void) => {
-    const handler = (_event: unknown, data: unknown) => callback(data);
-    ipcRenderer.on('session:update', handler);
+  // Sessions under Claude Code's supervisor
+  sessionList: (args?: { refresh?: boolean }) => ipcRenderer.invoke('session:list', args),
+  onSessionList: (callback: (rows: unknown) => void) => {
+    const handler = (_event: unknown, rows: unknown) => callback(rows);
+    ipcRenderer.on('session:list', handler);
     return () => {
-      ipcRenderer.removeListener('session:update', handler);
+      ipcRenderer.removeListener('session:list', handler);
     };
   },
+  sessionAttach: (args: unknown) => ipcRenderer.invoke('session:attach', args),
+  sessionStop: (jobId: string) => ipcRenderer.invoke('session:stop', jobId),
+  sessionRemove: (jobId: string) => ipcRenderer.invoke('session:remove', jobId),
+  sessionAdopt: (args: { projectId: string; jobId: string }) =>
+    ipcRenderer.invoke('session:adopt', args),
 
   // Telemetry
   telemetryCapture: (event: string, properties?: Record<string, unknown>) =>

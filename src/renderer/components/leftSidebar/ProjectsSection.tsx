@@ -14,6 +14,7 @@ import { IconButton } from '../ui/IconButton';
 import { Tooltip } from '../ui/Tooltip';
 import { formatTokens, formatCost } from '../../utils/format';
 import { TaskCard } from './TaskCard';
+import { ForeignSessionsSection } from './ForeignSessionsSection';
 import { openInIde } from '../../lib/openInIde';
 import { useSettings } from '../../stores/settingsStore';
 import { useRuntime } from '../../stores/runtimeStore';
@@ -365,6 +366,9 @@ export function ProjectsSection({
                           <p className="text-[10px] text-muted-foreground/60">No tasks yet</p>
                         </div>
                       )}
+
+                      {/* Sessions in this project that no task owns */}
+                      <ForeignSessionsSection project={project} onSelectTask={onSelectTask} />
 
                       {/* Archived tasks drawer */}
                       {archivedTasks.length > 0 && (

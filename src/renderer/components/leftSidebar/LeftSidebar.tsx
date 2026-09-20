@@ -121,6 +121,8 @@ export function LeftSidebar({
                       <div className="status-dot-unseen absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                     ) : activity === 'idle' ? (
                       <div className="status-dot-idle absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                    ) : activity === 'stopped' ? (
+                      <div className="status-dot-stopped absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                     ) : null}
                   </div>
                 );
@@ -158,7 +160,9 @@ export function LeftSidebar({
                   ? 'Waiting for user'
                   : activity === 'busy'
                     ? 'Claude is working'
-                    : 'Idle';
+                    : activity === 'stopped'
+                      ? 'Sessions sleeping'
+                      : 'Idle';
 
             return (
               <div
@@ -211,7 +215,9 @@ export function LeftSidebar({
                             ? 'status-dot-wait'
                             : activity === 'busy'
                               ? 'bg-amber-400 status-pulse'
-                              : 'status-dot-idle'
+                              : activity === 'stopped'
+                                ? 'status-dot-stopped'
+                                : 'status-dot-idle'
                       }`}
                     />
                   </Tooltip>

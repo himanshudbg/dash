@@ -54,21 +54,31 @@ export function TaskCard({
         ? 'Authentication error'
         : activityInfo.error.type === 'billing_error'
           ? 'Billing error'
-          : 'Error'
+          : activityInfo.error.type === 'supervisor'
+            ? `Session failed${activityInfo.error.message ? `: ${activityInfo.error.message}` : ''}`
+            : 'Error'
     : 'Error';
 
   const statusDot: { tooltip: string; className: string } | null =
     activityState === 'error'
       ? { tooltip: errorTooltip, className: 'status-dot-err' }
       : activityState === 'waiting'
-        ? { tooltip: 'Waiting for user', className: 'status-dot-wait' }
+        ? {
+            tooltip: activityInfo?.detail ? `Waiting: ${activityInfo.detail}` : 'Waiting for user',
+            className: 'status-dot-wait',
+          }
         : activityState === 'busy'
           ? { tooltip: busyTooltip, className: 'bg-amber-400 status-pulse' }
           : activityState === 'idle'
             ? isUnseen
               ? { tooltip: 'Done (unseen)', className: 'status-dot-unseen' }
               : { tooltip: 'Idle', className: 'status-dot-idle' }
-            : null;
+            : activityState === 'stopped'
+              ? {
+                  tooltip: activityInfo?.detail ?? 'Sleeping — opening the task resumes it',
+                  className: 'status-dot-stopped',
+                }
+              : null;
 
   return (
     <div

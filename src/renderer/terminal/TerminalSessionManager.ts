@@ -9,7 +9,7 @@ import { FilePathLinkProvider } from './FilePathLinkProvider';
 import type { ITheme } from '@xterm/xterm';
 import { darkTheme, lightTheme, resolveTheme } from './terminalThemes';
 import { getTerminalFont } from './terminalFonts';
-import { ptyExitFallback } from './ptyExitFallback';
+import { ptyExitFallback, foreignSessionJobId } from './ptyExitFallback';
 import { clackBlock, clackExitBlock } from './clackLines';
 import { isPromptOnlySnapshot } from './snapshotFilter';
 import { FitScheduler } from './FitScheduler';
@@ -46,6 +46,8 @@ export class TerminalSessionManager {
   private isDark = true;
   private _isRestarting = false;
   private onRestartingCallback: (() => void) | null = null;
+  private onDetachedCallback: ((info: { exitCode: number } | null) => void) | null = null;
+  private detachedInfo: { exitCode: number } | null = null;
   private onReadyCallback: (() => void) | null = null;
   private readyFired = false;
   private readyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -501,73 +503,15 @@ export class TerminalSessionManager {
           }
         }
       } else {
-        // Claude Code mode: try direct spawn, fall back to shell.
-        // Main process decides whether to resume (by checking if this task's
-        // own Claude session file exists) — renderer no longer gates on it.
-        let existingSnapshot: TerminalSnapshot | null = null;
-        try {
-          const snapshotResp = await window.electronAPI.ptyGetSnapshot(this.id);
-          if (snapshotResp.success && snapshotResp.data) {
-            existingSnapshot = snapshotResp.data;
-          }
-        } catch (err) {
-          // Snapshot fetch via IPC: legitimate "no snapshot" arrives as a
-          // success with empty data, so reaching the catch means IPC itself
-          // misbehaved — log so a permanently broken bridge is debuggable.
-          console.warn('[terminal] ptyGetSnapshot failed:', err);
-        }
+        // Claude Code mode: main finds (or dispatches) the task's session under
+        // Claude Code's supervisor and spawns a `claude attach` client into
+        // this PTY. The client repaints the whole screen on attach, so there is
+        // no snapshot or mirror state to restore — a renderer reload simply
+        // attaches again.
+        this.setDetached(null);
+        const result = await this.startPty();
         if (gen !== this.attachGeneration) return;
-
-        let result = await this.startPty();
-        if (gen !== this.attachGeneration) return;
-
-        // If we reattached to an existing direct-spawn PTY (e.g. after CMD+R),
-        // kill it and spawn fresh. Ink's internal cursor state can't be
-        // recovered via SIGWINCH, but a fresh Claude Code process with `-r`
-        // pointed at this task's session file gives a clean TUI init.
-        let mirrorState: string | null = null;
-        if (result.reattached && result.isDirectSpawn) {
-          // The old PTY's mirror state is fresher than the file snapshot —
-          // keep it for the context write below before killing the PTY.
-          mirrorState = result.serializedState ?? null;
-          this._isRestarting = true;
-          this.readyFired = false;
-          this.onRestartingCallback?.();
-          // Discard any data buffered from the old PTY before killing it
-          this.dataBuffer = [];
-          // Await the graceful kill (SIGTERM → flush → exit) before respawning
-          // so the fresh `claude --resume` doesn't race the dying process for
-          // the session jsonl. The map record is dropped synchronously in main,
-          // so the respawn below spawns fresh rather than reattaching.
-          await window.electronAPI.ptyKillAwait(this.id);
-          if (gen !== this.attachGeneration) return;
-          this.ptyStarted = false;
-          result = await this.startPty();
-          if (gen !== this.attachGeneration) return;
-
-          // Fallback: hide overlay after 10s even if no data arrives
-          this.readyFallbackTimer = setTimeout(() => {
-            this.fireReady();
-          }, 10_000);
-        }
-
         isDirectSpawn = result.isDirectSpawn;
-
-        // Show previous content for visual context while Claude starts —
-        // mirror state when we just recycled a live PTY, file snapshot on a
-        // cold start.
-        const restoreData =
-          mirrorState ?? (!result.reattached ? (existingSnapshot?.data ?? null) : null);
-        if (restoreData) {
-          try {
-            this.terminal.write(restoreData);
-          } catch (err) {
-            // xterm rejected the buffered bytes — usually a corrupt or
-            // malformed control sequence in the snapshot. Without logging,
-            // the user just sees a half-rendered terminal with no clue why.
-            console.warn('[terminal] writing restored state to xterm failed:', err);
-          }
-        }
       }
     }
 
@@ -669,6 +613,7 @@ export class TerminalSessionManager {
 
     // Clear callbacks to prevent stale setState on unmounted components
     this.onRestartingCallback = null;
+    this.onDetachedCallback = null;
     this.onReadyCallback = null;
     this.onCwdChangeCallback = null;
     this._isRestarting = false;
@@ -705,6 +650,31 @@ export class TerminalSessionManager {
   }
 
   /**
+   * Agent panes: called with the exit info when the attach client exits and
+   * the pane shows the Detached card, and with null when a (re)attach starts.
+   */
+  onDetached(cb: ((info: { exitCode: number } | null) => void) | null) {
+    this.onDetachedCallback = cb;
+    if (cb) cb(this.detachedInfo);
+  }
+
+  get isDetached(): boolean {
+    return this.detachedInfo !== null;
+  }
+
+  private setDetached(info: { exitCode: number } | null) {
+    this.detachedInfo = info;
+    this.onDetachedCallback?.(info);
+  }
+
+  /** Re-attach after a detach (Detached card → Re-attach). */
+  async reattach(): Promise<void> {
+    if (this.disposed || !this.currentContainer || this.ptyStarted) return;
+    this.dataBuffer = null;
+    await this.attach(this.currentContainer, { autoFocus: true });
+  }
+
+  /**
    * User-initiated restart — kill the current PTY and respawn fresh so the
    * new process inherits whatever env vars / settings have changed since
    * the original spawn. Used by the port-management flow to pick up newly
@@ -738,14 +708,11 @@ export class TerminalSessionManager {
       this.unsubData = null;
     }
 
-    // Await the graceful kill: main drops the PTY record synchronously and
-    // then waits for the child to flush + exit, so the respawn below spawns
-    // fresh (no reattach race) and no session-jsonl tail is lost. Replaces the
-    // old fire-and-forget kill + fixed 50ms settle.
-    await window.electronAPI.ptyKillAwait(this.id);
-    this.ptyStarted = false;
-
     if (this.shellOnly) {
+      // Await the graceful kill: main drops the PTY record synchronously and
+      // then waits for the child to exit, so the respawn below spawns fresh.
+      await window.electronAPI.ptyKillAwait(this.id);
+      this.ptyStarted = false;
       const dims = this.proposeDims();
       await window.electronAPI.ptyStart({
         id: this.id,
@@ -755,6 +722,18 @@ export class TerminalSessionManager {
       });
       this.ptyStarted = true;
     } else {
+      // Agent pane: a restart is a re-dispatch. Main kills the attach client,
+      // stops and forgets the supervisor job, and the attach below starts a
+      // fresh job that resumes the same session id with a fresh environment.
+      // A foreign session only gets a fresh attach client.
+      if (!foreignSessionJobId(this.id)) {
+        await window.electronAPI.ptyRestartSession(this.id);
+      } else {
+        await window.electronAPI.ptyKillAwait(this.id);
+      }
+      this.ptyStarted = false;
+      this.terminal.reset();
+      this.setDetached(null);
       await this.startPty();
     }
     this.connectPtyListeners();
@@ -1019,31 +998,35 @@ export class TerminalSessionManager {
   private async startPty(): Promise<{
     reattached: boolean;
     isDirectSpawn: boolean;
-    serializedState?: string;
   }> {
     const dims = this.proposeDims();
     const cols = this.ptyCols(dims?.cols ?? 120);
     const rows = dims?.rows ?? 30;
 
-    let reattached = false;
-    let isDirectSpawn = false;
-    let serializedState: string | undefined;
-    const resp = await window.electronAPI.ptyStartDirect({
-      id: this.id,
-      cwd: this.cwd,
-      cols,
-      rows,
-      permissionMode: this.permissionMode,
-      isDark: this.isDark,
-    });
+    // A foreign session (started outside Dash) is attached by job id; a task
+    // pane is started by task id and main resolves the job.
+    const foreignJobId = foreignSessionJobId(this.id);
+    const resp = foreignJobId
+      ? await window.electronAPI.sessionAttach({
+          jobId: foreignJobId,
+          cwd: this.cwd,
+          cols,
+          rows,
+          isDark: this.isDark,
+        })
+      : await window.electronAPI.ptyStartDirect({
+          id: this.id,
+          cwd: this.cwd,
+          cols,
+          rows,
+          permissionMode: this.permissionMode,
+          isDark: this.isDark,
+        });
 
-    if (resp.success) {
-      reattached = resp.data?.reattached ?? false;
-      isDirectSpawn = resp.data?.isDirectSpawn ?? true;
-      serializedState = resp.data?.serializedState;
-    } else {
+    let isDirectSpawn = true;
+    if (!resp.success) {
+      isDirectSpawn = false;
       const isNativeModuleError = resp.error?.includes('[native module]');
-
       if (resp.code === 'UNSUPPORTED_CLI') {
         // Missing or too-old Claude Code. MainContent normally renders the
         // ClaudeCliGate panel instead of mounting this terminal at all; if we
@@ -1053,7 +1036,6 @@ export class TerminalSessionManager {
           clackBlock('error', 'Cannot start the task session.', resp.error ?? 'Unsupported CLI'),
         );
       } else if (isNativeModuleError) {
-        // node-pty itself failed — shell fallback won't work either
         this.terminal.write(
           clackBlock(
             'error',
@@ -1063,40 +1045,23 @@ export class TerminalSessionManager {
           ),
         );
       } else {
-        // Claude CLI not found — fall back to shell
+        // Dispatch or attach failed (supervisor refused, CLI missing). No
+        // shell fallback: the pane belongs to the session, and a shell here
+        // would hide the failure behind a working prompt.
         this.terminal.write(
           clackBlock(
-            'warn',
-            'Could not start Claude CLI directly — falling back to shell.',
-            'Install with: npm install -g @anthropic-ai/claude-code',
+            'error',
+            'Could not start the Claude session.',
+            ...(resp.error ? [resp.error] : []),
+            'Use Restart in the task menu to try again.',
           ),
         );
-
-        const shellResp = await window.electronAPI.ptyStart({
-          id: this.id,
-          cwd: this.cwd,
-          cols,
-          rows,
-        });
-
-        if (shellResp.success) {
-          reattached = shellResp.data?.reattached ?? false;
-          isDirectSpawn = shellResp.data?.isDirectSpawn ?? false;
-        } else {
-          this.terminal.write(
-            clackBlock(
-              'error',
-              'Shell also failed to start.',
-              ...(shellResp.error ? [shellResp.error] : []),
-            ),
-          );
-        }
       }
     }
 
     this.ptyStarted = true;
 
-    return { reattached, isDirectSpawn, serializedState };
+    return { reattached: false, isDirectSpawn };
   }
 
   private fireReady() {
@@ -1150,14 +1115,26 @@ export class TerminalSessionManager {
       this.checkMemory();
     });
 
-    // Listen for PTY exit → spawn shell fallback (agent/shell tabs only)
+    // Listen for PTY exit → detached card (agent panes), shell fallback
+    // (shell tabs) or a message (main-spawned tabs).
     this.unsubExit = window.electronAPI.onPtyExit(this.id, (info) => {
       if (this.disposed) return;
 
       // Ensure PTY is cleaned up in main process
       window.electronAPI.ptyKill(this.id);
 
-      const fallback = ptyExitFallback(this.id, this.isTui);
+      const fallback = ptyExitFallback(this.id, this.isTui, this.shellOnly);
+      if (fallback.action === 'detached') {
+        // The `claude attach` client exited (Esc out of agent view, Ctrl+Z,
+        // or the session process went away); the session itself lives on
+        // under the supervisor. Leave the alternate screen and mouse modes
+        // the client enabled so the pane is a plain terminal again, then
+        // hand the pane to the Detached card (TerminalPane).
+        this.ptyStarted = false;
+        this.terminal.reset();
+        this.setDetached({ exitCode: info.exitCode });
+        return;
+      }
       if (fallback.action === 'message') {
         this.terminal.write(clackExitBlock(info.exitCode, fallback.message));
         return;

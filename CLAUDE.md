@@ -30,7 +30,9 @@ Renderer hot-reloads; main process changes require restart. Husky pre-commit run
 
 Two-process Electron app, strict context isolation (nodeIntegration disabled).
 
-- **Main** (`src/main/`): `entry.ts` → `main.ts` boots PATH fix, DB, hook server, IPC handlers, activity monitor, window.
+- **Main** (`src/main/`): `entry.ts` → `main.ts` boots PATH fix, DB, hook server, IPC handlers, activity monitor, supervisor polling, window. `DASH_USER_DATA_DIR` and `DASH_DEV_URL` env vars point a second dev instance at its own data dir and Vite port (needed to run a checkout beside an installed Dash).
+- **Task sessions** live under Claude Code's session supervisor, not under Dash: `SupervisorService` dispatches `claude --bg --name <task> …` in the worktree (resuming the task's recorded session id, or the newest transcript for a pre-supervisor task), records `tasks.job_id` / `session_id`, and `ptyManager` spawns `claude attach <jobId>` as the task's agent PTY. Killing an agent PTY only detaches; archive → `claude stop`, delete → `claude rm`, restart → stop + rm + re-dispatch with `--resume`. `SupervisorService.startPolling` reconciles `claude agents --json --all` into `ActivityMonitor` (hooks stay the instant signal; the listing is the truth for `waiting`/`error`/`stopped`) and pushes the listing to the renderer for the per-project "Other sessions" group.
+- **Hooks**: written per worktree to `.claude/settings.local.json` (`ptyHookSettings.ts`), keyed by `?ptyId=<taskId>`. Commands read the HookServer port from `<userData>/hook-port` at runtime (the supervisor freezes the dispatch env into the job, so the port cannot live in the env). Any hook event newer than `MIN_CLAUDE_VERSION` must still be gated with `isClaudeVersionAtLeast` (an unknown key makes Claude Code drop the whole file).
 - **Renderer** (`src/renderer/`): React SPA. State lives in **Zustand stores** under `src/renderer/stores/` (`settingsStore`, `projectsStore`, `uiStore`, `gitStore`, `runtimeStore`); components subscribe with selectors instead of receiving drilled props, and stores read each other via `getState()`. `App.tsx` is a thin composition root (layout + modals + bootstrap). Communicates via `window.electronAPI` (preload bridge, typed in `src/types/electron-api.d.ts`). **Selector caveat:** a selector that returns a _derived_ array/object (`.filter`/`.map`/object-literal) must be wrapped in `useShallow` (`zustand/react/shallow`) or it re-renders infinitely; plain `s => s.field` selectors are stable.
 - **IPC**: `electronAPI.method()` → `ipcRenderer.invoke()` → handler in `src/main/ipc/` → `IpcResponse<T>` `{ success, data?, error? }`. Fire-and-forget via `send()` for ptyInput/resize/kill/snapshot-save.
 - **Services** (`src/main/services/`): Stateless singletons with static methods.
@@ -56,7 +58,8 @@ Main process `entry.ts` rewrites at runtime: `@shared/*` → `dist/main/shared/*
 ## Data Storage
 
 - **DB**: `~/Library/Application Support/Dash/app.db` (macOS) · `~/.config/Dash/app.db` (Linux)
-- **Snapshots**: `~/Library/Application Support/Dash/terminal-snapshots/`
+- **Snapshots**: `~/Library/Application Support/Dash/terminal-snapshots/` (shell and service tabs only; agent panes repaint on attach)
+- **Hook port file**: `~/Library/Application Support/Dash/hook-port` while Dash runs
 - **Worktrees**: `{projectPath}/.claude/worktrees/{task-slug}-{hash}/` (excluded via `.git/info/exclude`; legacy `{projectPath}/../worktrees/` tasks are migrated by `WorktreeMigrationService`)
 - **UI state**: localStorage (active project/task, theme, keybindings, panel states, notification prefs)
 

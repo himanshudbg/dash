@@ -405,6 +405,19 @@ export function registerAppIpc(): void {
     })();
   });
 
+  ipcMain.on('app:setStopSessionsOnQuit', (_event, enabled: boolean) => {
+    const v = parseArgsSafe('app:setStopSessionsOnQuit', z.boolean(), enabled);
+    if (v === undefined) return;
+    void (async () => {
+      try {
+        const { setStopSessionsOnQuit } = await import('../services/ptyManager');
+        setStopSessionsOnQuit(v);
+      } catch (err) {
+        console.error('[app:setStopSessionsOnQuit] Failed:', err);
+      }
+    })();
+  });
+
   ipcMain.on('app:setUltracode', (_event, enabled: boolean) => {
     const v = parseArgsSafe('app:setUltracode', z.boolean(), enabled);
     if (v === undefined) return;

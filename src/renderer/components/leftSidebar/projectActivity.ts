@@ -1,11 +1,11 @@
 import type { Task, ActivityInfo } from '../../../shared/types';
 
-export type ProjectActivity = 'busy' | 'idle' | 'waiting' | 'error' | null;
+export type ProjectActivity = 'busy' | 'idle' | 'waiting' | 'error' | 'stopped' | null;
 
 /**
  * Roll up a project's task activity into a single status, using the same
- * severity order the sidebar dots use (error > waiting > busy > idle).
- * Archived tasks are ignored.
+ * severity order the sidebar dots use (error > waiting > busy > idle >
+ * stopped). Archived tasks are ignored.
  */
 export function getProjectActivity(
   tasks: Task[],
@@ -16,5 +16,6 @@ export function getProjectActivity(
   if (active.some((t) => taskActivity[t.id]?.state === 'waiting')) return 'waiting';
   if (active.some((t) => taskActivity[t.id]?.state === 'busy')) return 'busy';
   if (active.some((t) => taskActivity[t.id]?.state === 'idle')) return 'idle';
+  if (active.some((t) => taskActivity[t.id]?.state === 'stopped')) return 'stopped';
   return null;
 }

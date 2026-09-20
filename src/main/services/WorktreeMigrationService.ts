@@ -5,6 +5,7 @@ import type { WorktreeMigrationProject, WorktreeMigrationResult } from '@shared/
 import { DatabaseService } from './DatabaseService';
 import { worktreeService } from './WorktreeService';
 import { listForTask, killPtyAwait } from './ptyManager';
+import { supervisorService } from './SupervisorService';
 import { buildMigrationPlan, isWorktreeLockedError } from './worktreeMigrationPlan';
 
 const execFileAsync = promisify(execFile);
@@ -76,11 +77,20 @@ class WorktreeMigrationServiceImpl {
       throw new Error(`Worktree directory is missing: ${task.fromPath}`);
     }
 
-    // Nothing may run inside the directory while it moves. Graceful kill
-    // (SIGTERM + grace) so a live Claude session flushes its transcript; the
-    // renderer disposes its cached terminals and remounts after the move.
+    // Nothing may run inside the directory while it moves: kill the task's
+    // PTYs (attach client and shells), and if the task already has a job
+    // under the supervisor, stop it and forget it — the supervisor keeps a
+    // job bound to its cwd and would refuse a later `--bg --resume` from the
+    // new path ("working directory no longer exists") while queueing the
+    // prompt. The session id stays on the task, so the next open resumes it.
     for (const ptyId of listForTask(task.taskId)) {
       await killPtyAwait(ptyId);
+    }
+    const record = DatabaseService.getTask(task.taskId);
+    if (record?.jobId) {
+      await supervisorService.stop(record.jobId).catch(() => {});
+      await supervisorService.remove(record.jobId);
+      DatabaseService.setTaskSession(task.taskId, { jobId: null, sessionId: record.sessionId });
     }
 
     await this.gitWorktreeMove(projectPath, task.fromPath, task.toPath);

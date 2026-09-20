@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { SearchAddon } from '@xterm/addon-search';
+import { PlugZap } from 'lucide-react';
 import { sessionRegistry } from '../../terminal/SessionRegistry';
 import type { PermissionMode } from '../../../shared/types';
 import { TerminalSearch } from './TerminalSearch';
+import { Button } from '../ui/Button';
 
 const OVERLAY_MIN_MS = 2000;
 const OVERLAY_FADE_MS = 300;
@@ -21,6 +23,9 @@ export function TerminalPane({ id, cwd, permissionMode, terminalBg }: TerminalPa
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  // Agent panes: set when the `claude attach` client exited. The session keeps
+  // running under Claude Code's supervisor; Re-attach opens a new client.
+  const [detached, setDetached] = useState<{ exitCode: number } | null>(null);
 
   const hideOverlay = useCallback(() => {
     // Start fade-out
@@ -51,6 +56,8 @@ export function TerminalPane({ id, cwd, permissionMode, terminalBg }: TerminalPa
       setTimeout(hideOverlay, remaining);
     });
 
+    session.onDetached((info) => setDetached(info));
+
     // Wire find shortcut: xterm consumes keystrokes while focused, so the
     // intercept lives at the session layer (see TerminalSessionManager).
     session.setOnFindKey(() => setShowSearch(true));
@@ -61,9 +68,14 @@ export function TerminalPane({ id, cwd, permissionMode, terminalBg }: TerminalPa
 
     return () => {
       session.setOnFindKey(null);
+      session.onDetached(null);
       sessionRegistry.detach(id);
     };
   }, [id, cwd, permissionMode, hideOverlay]);
+
+  const reattach = useCallback(() => {
+    void sessionRegistry.get(id)?.reattach();
+  }, [id]);
 
   return (
     <div
@@ -124,6 +136,36 @@ export function TerminalPane({ id, cwd, permissionMode, terminalBg }: TerminalPa
           <span className="text-[13px] dark:text-neutral-400 text-neutral-500 font-medium">
             Resuming your session...
           </span>
+        </div>
+      )}
+      {detached && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center animate-fade-in"
+          style={{ background: terminalBg }}
+        >
+          <div
+            className="flex flex-col items-center gap-3 px-8 py-6 rounded-2xl border border-border/40 text-center max-w-[360px]"
+            style={{ background: 'hsl(var(--surface-2))' }}
+          >
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-accent/80 text-muted-foreground">
+              <PlugZap size={16} strokeWidth={1.8} />
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-foreground">Detached from session</p>
+              <p className="text-[11.5px] text-muted-foreground leading-relaxed mt-1">
+                The session keeps running under Claude Code. Re-attach to pick up where it is, with
+                a recap of what happened meanwhile.
+              </p>
+            </div>
+            <Button size="sm" onClick={reattach}>
+              Re-attach
+            </Button>
+            <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed">
+              Inside the pane: <kbd className="font-mono">←</kbd> on an empty prompt opens agent
+              view, <kbd className="font-mono">Esc</kbd> leaves it,{' '}
+              <kbd className="font-mono">Ctrl+Z</kbd> detaches.
+            </p>
+          </div>
         </div>
       )}
       {isDragOver && (

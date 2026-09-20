@@ -14,6 +14,7 @@ import {
   sendRemoteControl,
   listForTask,
   setInitialPrompt,
+  restartTaskSession,
   type PtyKind,
 } from '../services/ptyManager';
 import { DatabaseService } from '../services/DatabaseService';
@@ -70,17 +71,19 @@ export function registerPtyIpc(): void {
         // renderer from falling back to a shell in the task pane.
         await requireSupportedClaude();
 
-        // The agent PTY id is the bare task id — look up its name and model so a
-        // fresh spawn gets `claude --name <task>` (recognizable in /resume +
-        // title) and `--model <alias>` (the user's per-task model choice). Read
-        // from the DB here rather than threading through the renderer, since both
-        // are stable task settings resolved at spawn time.
+        // The agent PTY id is the bare task id — look up its name, model and
+        // recorded supervisor job so a dispatch gets `--name <task>` and
+        // `--model <alias>`, and an existing job is attached rather than
+        // re-dispatched. Read from the DB here rather than threading through
+        // the renderer, since all are stable task settings resolved at spawn.
         const task = DatabaseService.getTask(args.id);
         const result = await startDirectPty({
           ...args,
           name: task?.name,
           model: task?.model,
           previousPath: task?.previousPath,
+          jobId: task?.jobId,
+          sessionId: task?.sessionId,
           sender: event.sender,
         });
         TelemetryService.capture('terminal_started', { source: 'direct' });
@@ -147,7 +150,20 @@ export function registerPtyIpc(): void {
     }
   });
 
-  // Snapshot handlers
+  // Re-dispatch the task's session (stop + rm; the next startDirect resumes
+  // the same session id in a fresh job with a fresh environment). The
+  // renderer's restart path awaits this before re-attaching.
+  ipcMain.handle('pty:restartSession', async (_event, taskId: string) => {
+    try {
+      parseArgs('pty:restartSession', z.string(), taskId);
+      await restartTaskSession(taskId);
+      return { success: true };
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
+
+  // Snapshot handlers (shell and service tabs; agent panes repaint on attach)
   ipcMain.handle('pty:snapshot:get', async (_event, id: string) => {
     try {
       parseArgs('pty:snapshot:get', z.string(), id);
