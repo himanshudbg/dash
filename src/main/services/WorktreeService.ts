@@ -7,6 +7,7 @@ import { BrowserWindow } from 'electron';
 import type { WorktreeInfo, RemoveWorktreeOptions } from '@shared/types';
 import { slugify } from '@shared/slug';
 import { GithubService } from './GithubService';
+import { withExcludeEntry, WORKTREES_EXCLUDE_ENTRY } from './gitExclude';
 import {
   loadWorkspaceConfig,
   resolveSetupCommand,
@@ -57,12 +58,7 @@ export class WorktreeService {
     const branchName = `${slug}-${hash}`;
 
     const baseRef = await this.resolveBaseRef(projectPath, options.baseRef);
-    const worktreesDir = this.getWorktreesDir(projectPath);
-
-    // Ensure worktrees directory exists
-    if (!fs.existsSync(worktreesDir)) {
-      fs.mkdirSync(worktreesDir, { recursive: true });
-    }
+    const worktreesDir = await this.ensureWorktreesDir(projectPath);
 
     const worktreePath = path.join(worktreesDir, `${slug}-${hash}`);
 
@@ -453,11 +449,7 @@ export class WorktreeService {
 
     const dirSlug = this.slugify(branch);
     const hash = this.generateShortHash();
-    const worktreesDir = this.getWorktreesDir(projectPath);
-
-    if (!fs.existsSync(worktreesDir)) {
-      fs.mkdirSync(worktreesDir, { recursive: true });
-    }
+    const worktreesDir = await this.ensureWorktreesDir(projectPath);
 
     const worktreePath = path.join(worktreesDir, `${dirSlug}-${hash}`);
 
@@ -543,8 +535,68 @@ export class WorktreeService {
     };
   }
 
+  /**
+   * Where a project's task worktrees live: `<repo>/.claude/worktrees/`, the
+   * layout Claude Code uses for its own worktrees. Keeping ours there means
+   * `claude agents --cwd <repo>` lists task sessions, `@<repo>` targeting sees
+   * the worktrees, and a background session inside one is recognised as an
+   * already-isolated linked worktree instead of being re-isolated.
+   */
   getWorktreesDir(projectPath: string): string {
+    return path.join(path.resolve(projectPath), '.claude', 'worktrees');
+  }
+
+  /**
+   * Pre-0.16 location, `<parent-of-repo>/worktrees/`. Only the migration
+   * (WorktreeMigrationService) and the orphan-reserve sweep still look here.
+   */
+  getLegacyWorktreesDir(projectPath: string): string {
     return path.join(path.dirname(path.resolve(projectPath)), 'worktrees');
+  }
+
+  /** True when `worktreePath` sits under the project's pre-0.16 worktrees dir. */
+  isLegacyWorktreePath(projectPath: string, worktreePath: string): boolean {
+    const legacy = this.getLegacyWorktreesDir(projectPath);
+    const rel = path.relative(legacy, path.resolve(worktreePath));
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  }
+
+  /**
+   * Create the worktrees dir if needed and make sure the main checkout ignores
+   * it (via `.git/info/exclude`, never the tracked `.gitignore`). Returns the dir.
+   */
+  async ensureWorktreesDir(projectPath: string): Promise<string> {
+    const worktreesDir = this.getWorktreesDir(projectPath);
+    if (!fs.existsSync(worktreesDir)) {
+      fs.mkdirSync(worktreesDir, { recursive: true });
+    }
+    await this.ensureWorktreesExcluded(projectPath);
+    return worktreesDir;
+  }
+
+  /**
+   * Append `.claude/worktrees/` to the repository's private exclude file so
+   * task worktrees never show up as untracked in the main checkout. Idempotent
+   * and best-effort: a failure only means noisier `git status`, never a
+   * broken task.
+   */
+  async ensureWorktreesExcluded(projectPath: string): Promise<void> {
+    try {
+      const { stdout } = await execFileAsync('git', ['rev-parse', '--git-common-dir'], {
+        cwd: projectPath,
+      });
+      const gitDir = path.resolve(projectPath, stdout.trim());
+      const infoDir = path.join(gitDir, 'info');
+      fs.mkdirSync(infoDir, { recursive: true });
+      const excludePath = path.join(infoDir, 'exclude');
+      const existing = fs.existsSync(excludePath) ? fs.readFileSync(excludePath, 'utf-8') : '';
+      const next = withExcludeEntry(existing, WORKTREES_EXCLUDE_ENTRY);
+      if (next !== null) fs.writeFileSync(excludePath, next, 'utf-8');
+    } catch (err) {
+      console.warn(
+        `[WorktreeService] Could not update .git/info/exclude for ${projectPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /** Thin wrapper over the shared {@link slugify} so existing

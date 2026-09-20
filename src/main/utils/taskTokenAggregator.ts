@@ -17,29 +17,44 @@ export interface TaskTokenStats {
 
 const EMPTY: TaskTokenStats = { totalTokens: 0, totalCostUsd: 0 };
 
-export async function aggregateTokenStatsForTaskPath(taskPath: string): Promise<TaskTokenStats> {
-  const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeProjectPath(taskPath));
-
-  let entries: string[];
-  try {
-    entries = await fs.promises.readdir(projectDir);
-  } catch {
-    return EMPTY;
-  }
+/**
+ * Sum tokens + cost over every transcript Claude wrote for a task. Accepts the
+ * task's current path plus any earlier one (Task.previousPath after the 0.16
+ * worktree move): Claude keys transcript dirs by the cwd a session started in,
+ * so a moved task's history is split across two encoded dirs. Messages are
+ * deduplicated by requestId across all of them.
+ */
+export async function aggregateTokenStatsForTaskPath(
+  taskPath: string | Array<string | null | undefined>,
+): Promise<TaskTokenStats> {
+  const paths = (Array.isArray(taskPath) ? taskPath : [taskPath]).filter(
+    (p): p is string => typeof p === 'string' && p.length > 0,
+  );
 
   const allMessages: ParsedSessionMessage[] = [];
-  for (const entry of entries) {
-    if (!entry.endsWith('.jsonl')) continue;
-    const full = path.join(projectDir, entry);
-    let data: string;
+  for (const p of new Set(paths)) {
+    const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeProjectPath(p));
+
+    let entries: string[];
     try {
-      data = await fs.promises.readFile(full, 'utf8');
+      entries = await fs.promises.readdir(projectDir);
     } catch {
       continue;
     }
-    for (const line of data.split('\n')) {
-      const parsed = parseJsonlLine(line);
-      if (parsed) allMessages.push(parsed);
+
+    for (const entry of entries) {
+      if (!entry.endsWith('.jsonl')) continue;
+      const full = path.join(projectDir, entry);
+      let data: string;
+      try {
+        data = await fs.promises.readFile(full, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const line of data.split('\n')) {
+        const parsed = parseJsonlLine(line);
+        if (parsed) allMessages.push(parsed);
+      }
     }
   }
 

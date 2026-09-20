@@ -77,6 +77,10 @@ export interface Task {
    *  (newline-separated commands). Null = no per-task scripts. */
   setupScript: string | null;
   teardownScript: string | null;
+  /** Worktree path before the 0.16 move to `<repo>/.claude/worktrees/`; null
+   *  when the task was never moved. Claude transcripts written before the move
+   *  live under this path's encoded dir. */
+  previousPath: string | null;
   archivedAt: string | null;
   sortOrder: number;
   totalTokens: number;
@@ -84,6 +88,32 @@ export interface Task {
   tokensBackfilledAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One legacy-layout task the launch dialog offers to move. */
+export interface WorktreeMigrationTask {
+  taskId: string;
+  taskName: string;
+  branch: string;
+  archived: boolean;
+  fromPath: string;
+  toPath: string;
+}
+
+/** Per-project group of the migration plan (only projects with legacy tasks). */
+export interface WorktreeMigrationProject {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+  legacyDir: string;
+  targetDir: string;
+  tasks: WorktreeMigrationTask[];
+}
+
+export interface WorktreeMigrationResult {
+  projectId: string;
+  moved: string[];
+  failed: Array<{ taskId: string; taskName: string; error: string }>;
 }
 
 export interface Conversation {
@@ -108,9 +138,24 @@ export interface TokenStatsRollup {
  * branch on the kind of failure instead of pattern-matching the message string.
  * - `VALIDATION`: arguments failed the handler's zod schema (a renderer bug).
  * - `NOT_FOUND`: the referenced entity (task, file, branch, commit…) is missing.
+ * - `UNSUPPORTED_CLI`: the Claude Code CLI is missing or older than the floor
+ *   Dash requires (`MIN_CLAUDE_VERSION`); the renderer shows the upgrade panel
+ *   instead of falling back to a shell.
  * - `UNKNOWN`: any other caught error (the default).
  */
-export type IpcErrorCode = 'VALIDATION' | 'NOT_FOUND' | 'UNKNOWN';
+export type IpcErrorCode = 'VALIDATION' | 'NOT_FOUND' | 'UNSUPPORTED_CLI' | 'UNKNOWN';
+
+/** Result of the startup `claude --version` probe, as exposed to the renderer. */
+export interface ClaudeCliInfo {
+  installed: boolean;
+  version: string | null;
+  path: string | null;
+  /** Oldest Claude Code Dash runs task sessions on. */
+  minVersion: string;
+  /** False when missing or below `minVersion`; `unsupportedReason` says why. */
+  supported: boolean;
+  unsupportedReason: string | null;
+}
 
 export interface IpcResponse<T = unknown> {
   success: boolean;

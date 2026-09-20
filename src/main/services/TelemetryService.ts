@@ -33,6 +33,7 @@ const ALLOWED_EVENTS = new Set([
   // Features
   'worktree_created',
   'worktree_removed',
+  'worktree_migrated',
   'terminal_started',
   'settings_changed',
 

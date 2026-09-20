@@ -1,6 +1,8 @@
 # Plan: run Dash task sessions under Claude Code's session supervisor
 
-Status: spikes run (§4.1), plan adjusted; ready to schedule phase 1.
+Status: spikes run (§4.1), plan adjusted. PR 1 (§6.1 + §6.2: version floor,
+worktree relocation, migration dialog) implemented on
+`claude/dash-cc-session-upgrade-h95ton`; PR 2 (§6.3–§6.10) next.
 Written against Dash v0.15.1 and Claude Code 2.1.278 (docs as of 2026-09-20).
 
 ## 1. Decision summary
@@ -191,9 +193,12 @@ ALTER TABLE tasks ADD COLUMN previous_path TEXT;   -- pre-migration worktree pat
 ALTER TABLE tasks ADD COLUMN session_stopped_at TEXT; -- set when Dash or the supervisor stopped it
 ```
 
-- `last_session_id` (deprecated since 0.9.9) is repurposed during migration
-  only: the newest transcript id captured before a worktree is moved (§6.2).
-  After the migrated task is first opened, `session_id` holds the live value.
+- `last_session_id` (deprecated since 0.9.9) stays unused. PR 1 found a
+  simpler route for migrated tasks: `findLatestSessionId(cwd, previousPath)`
+  searches both transcript dirs and picks the newest file, so the direct-spawn
+  `--resume` keeps following the conversation after the move with no captured
+  id. PR 2 reads `previous_path` the same way when it dispatches the first
+  supervisor session for a migrated task.
 - `conversations` is left as is in phase 1. Phase 2 renames it to `sessions`
   with `job_id`, `session_id`, `kind`, `title` (§7). Phase 1 writes the task's
   own job into the task row, not into `conversations`, so no data has to move.
@@ -271,9 +276,10 @@ are the ones to touch; line references are to v0.15.1.
      checkbox writes a localStorage key and leaves those tasks on their old
      paths permanently, which still works because the supervisor does not
      care where a linked worktree lives).
-  3. Move, per task, in order: refuse if the task has a live agent PTY;
-     capture `findLatestSessionId(oldPath)` into `last_session_id` (the last
-     use of that helper before it is deleted); if the task already has a
+  3. Move, per task, in order: gracefully kill the task's PTYs (agent and
+     shells) so nothing holds the directory (PR 1 does this in
+     `WorktreeMigrationService.migrateTask`; the renderer disposes its cached
+     terminals and remounts after the move); if the task already has a
      `job_id`, `claude stop` then **`claude rm <job_id>`** (the supervisor
      otherwise keeps a job record bound to the old cwd and every later
      `--bg --resume` fails with "working directory no longer exists", see
@@ -285,12 +291,12 @@ are the ones to touch; line references are to v0.15.1.
      are keyed by task id. Errors are collected and shown per task; a failed
      task stays on its old path and keeps working.
   4. On the first open of a migrated task, `SupervisorService.dispatch`
-     passes `--resume <last_session_id>` together with `--name <task>` and
-     the permission and model flags (a resume without them gets an
-     auto-generated name and no flags, see §4.1), so the conversation
-     continues in the new location. The transcript keeps being written under
-     the old encoded directory, which is why `previous_path` feeds token
-     aggregation.
+     passes `--resume <id>` (the newest transcript across `path` and
+     `previous_path`) together with `--name <task>` and the permission and
+     model flags (a resume without them gets an auto-generated name and no
+     flags, see §4.1), so the conversation continues in the new location.
+     The transcript keeps being written under the old encoded directory,
+     which is why `previous_path` feeds token aggregation.
 - Token aggregation (`src/main/utils/taskTokenAggregator.ts:21`) takes a list
   of paths; `TokenStatsService` passes `[path, previous_path]`. Transcripts
   written before the move stay under the old encoded directory.

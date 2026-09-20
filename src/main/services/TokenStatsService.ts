@@ -24,7 +24,7 @@ class TokenStatsServiceImpl {
     try {
       const task = DatabaseService.getTask(taskId);
       if (!task) return;
-      const stats = await aggregateTokenStatsForTaskPath(task.path);
+      const stats = await aggregateTokenStatsForTaskPath([task.path, task.previousPath]);
       DatabaseService.updateTaskTokenStats(taskId, stats);
       this.broadcast({ taskId, ...stats });
     } catch (err) {

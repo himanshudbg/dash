@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseArgs, errorResponse } from './validate';
 import { worktreeService } from '../services/WorktreeService';
 import { worktreePoolService } from '../services/WorktreePoolService';
+import { worktreeMigrationService } from '../services/WorktreeMigrationService';
 import { TelemetryService } from '../services/TelemetryService';
 
 export function registerWorktreeIpc(): void {
@@ -204,6 +205,30 @@ export function registerWorktreeIpc(): void {
       }
     },
   );
+
+  // Pre-0.16 worktrees lived at `<parent>/worktrees/`; the launch dialog offers
+  // to move them under `<repo>/.claude/worktrees/`. Plan is read-only.
+  ipcMain.handle('worktree:migrationPlan', () => {
+    try {
+      return { success: true, data: worktreeMigrationService.plan() };
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
+
+  ipcMain.handle('worktree:migrate', async (_event, args: { projectId: string }) => {
+    try {
+      parseArgs('worktree:migrate', z.looseObject({ projectId: z.string() }), args);
+      const data = await worktreeMigrationService.migrateProject(args.projectId);
+      TelemetryService.capture('worktree_migrated', {
+        moved: data.moved.length,
+        failed: data.failed.length,
+      });
+      return { success: true, data };
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
 
   ipcMain.handle('worktree:hasReserve', async (_event, projectId: string) => {
     try {

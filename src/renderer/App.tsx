@@ -19,6 +19,10 @@ import { TaskModal } from './components/task/TaskModal';
 import { NewProjectWizard } from './components/newProject/NewProjectWizard';
 import { DeleteTaskModal } from './components/task/DeleteTaskModal';
 import { DeleteProjectModal } from './components/project/DeleteProjectModal';
+import {
+  WorktreeMigrationModal,
+  isWorktreeMigrationDismissed,
+} from './components/project/WorktreeMigrationModal';
 import { RemoteControlModal } from './components/RemoteControlModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ProjectSettingsModal } from './components/project/ProjectSettingsModal';
@@ -29,7 +33,7 @@ import { toast } from 'sonner';
 import { getBillionToastContent } from './utils/billionToast';
 import { useStatusLine } from './hooks/useStatusLine';
 import { useThresholdAlerts } from './hooks/useThresholdAlerts';
-import type { Task } from '../shared/types';
+import type { Task, WorktreeMigrationProject, WorktreeMigrationResult } from '../shared/types';
 import type { CreateTaskOptions, TaskModalDefaults } from './components/task/TaskModal';
 import { matchesBinding } from './keybindings';
 import { sessionRegistry } from './terminal/SessionRegistry';
@@ -560,6 +564,39 @@ export function App() {
       }
     }
   }, [projects, activeProjectId]);
+
+  // One-time offer to move pre-0.16 worktrees (`<parent>/worktrees/`) under
+  // each project's `.claude/worktrees/`. Asked once per launch, after every
+  // project's tasks are loaded, unless the user ticked "Don't ask again".
+  const [worktreeMigrationPlan, setWorktreeMigrationPlan] = useState<
+    WorktreeMigrationProject[] | null
+  >(null);
+  const migrationCheckedRef = useRef(false);
+  useEffect(() => {
+    if (migrationCheckedRef.current) return;
+    if (projects.length === 0) return;
+    if (Object.keys(tasksByProject).length < projects.length) return;
+    migrationCheckedRef.current = true;
+    if (isWorktreeMigrationDismissed()) return;
+    void window.electronAPI.worktreeMigrationPlan().then((resp) => {
+      if (resp.success && resp.data && resp.data.length > 0) {
+        setWorktreeMigrationPlan(resp.data);
+      }
+    });
+  }, [projects, tasksByProject]);
+
+  const handleWorktreesMigrated = useCallback(async (results: WorktreeMigrationResult[]) => {
+    // Main killed the moved tasks' PTYs before `git worktree move`; drop the
+    // renderer's cached terminals (they hold the old cwd) so the panes remount
+    // against the new path once the reloaded tasks arrive.
+    for (const r of results) {
+      for (const taskId of r.moved) {
+        await sessionRegistry.dispose(taskId);
+        await sessionRegistry.disposeByPrefix(`shell:${taskId}`);
+      }
+      await useProjects.getState().loadTasks(r.projectId);
+    }
+  }, []);
 
   // Detect pre-existing duplicate non-worktree tasks at the same cwd and warn
   // the user once per app session. The new resume strategy (`claude --continue`)
@@ -1429,6 +1466,14 @@ export function App() {
           task={deleteTaskTarget}
           onClose={() => setDeleteTaskTarget(null)}
           onConfirm={handleDeleteTaskConfirm}
+        />
+      )}
+
+      {worktreeMigrationPlan && (
+        <WorktreeMigrationModal
+          plan={worktreeMigrationPlan}
+          onClose={() => setWorktreeMigrationPlan(null)}
+          onMigrated={handleWorktreesMigrated}
         />
       )}
 

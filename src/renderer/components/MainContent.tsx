@@ -1,5 +1,6 @@
 import React from 'react';
 import { TerminalPane } from './terminal/TerminalPane';
+import { ClaudeCliGate } from './terminal/ClaudeCliGate';
 import { ProjectOverview } from './project/ProjectOverview';
 import { useSettings } from '../stores/settingsStore';
 import { useGit } from '../stores/gitStore';
@@ -139,6 +140,7 @@ export function MainContent({
   const gitStatus = useGit((s) => s.gitStatus);
   const prInfo = useGit((s) => s.prInfo);
   const remoteControlStates = useRuntime((s) => s.remoteControlStates);
+  const claudeCli = useRuntime((s) => s.claudeCli);
   const remoteControlState = activeTask ? (remoteControlStates[activeTask.id] ?? null) : null;
   if (!activeProject) {
     return (
@@ -297,7 +299,12 @@ export function MainContent({
       />
       {strip}
       <div className="flex-1 min-h-0 relative">
-        {activeTask ? (
+        {activeTask && claudeCli && !claudeCli.supported ? (
+          // Hard floor: never mount the terminal (and so never spawn) on a
+          // missing or too-old CLI. `claudeCli === null` means the probe hasn't
+          // answered yet; the terminal mounts and pty:startDirect awaits it.
+          <ClaudeCliGate info={claudeCli} />
+        ) : activeTask ? (
           <TerminalPane
             key={activeTask.id}
             id={activeTask.id}

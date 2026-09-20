@@ -5,6 +5,7 @@ import type {
   BranchInfo,
   CommitGraphData,
   CommitDetail,
+  ClaudeCliInfo,
 } from '../../shared/types';
 
 /** Git + Claude detection and all git operations: status/diff, staging, commit
@@ -15,9 +16,8 @@ export interface GitApi {
     folderPath: string,
   ) => Promise<IpcResponse<{ isGitRepo: boolean; remote: string | null; branch: string | null }>>;
   gitInit: (folderPath: string) => Promise<IpcResponse<null>>;
-  detectClaude: () => Promise<
-    IpcResponse<{ installed: boolean; version: string | null; path: string | null }>
-  >;
+  /** Startup `claude --version` probe. `refresh` re-runs it (after an install/update). */
+  detectClaude: (args?: { refresh?: boolean }) => Promise<IpcResponse<ClaudeCliInfo>>;
 
   // Operations
   gitClone: (args: { url: string }) => Promise<IpcResponse<{ path: string; name: string }>>;

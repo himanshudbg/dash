@@ -57,9 +57,9 @@ Main process `entry.ts` rewrites at runtime: `@shared/*` → `dist/main/shared/*
 
 - **DB**: `~/Library/Application Support/Dash/app.db` (macOS) · `~/.config/Dash/app.db` (Linux)
 - **Snapshots**: `~/Library/Application Support/Dash/terminal-snapshots/`
-- **Worktrees**: `{projectPath}/../worktrees/{task-slug}/`
+- **Worktrees**: `{projectPath}/.claude/worktrees/{task-slug}-{hash}/` (excluded via `.git/info/exclude`; legacy `{projectPath}/../worktrees/` tasks are migrated by `WorktreeMigrationService`)
 - **UI state**: localStorage (active project/task, theme, keybindings, panel states, notification prefs)
 
 ## Requirements
 
-Node.js 24 (`.nvmrc`), pnpm (`shamefully-hoist` in `.npmrc`), Claude Code CLI, Git. macOS arm64 or Linux x64.
+Node.js 24 (`.nvmrc`), pnpm (`shamefully-hoist` in `.npmrc`), Claude Code CLI ≥ 2.1.257 (`MIN_CLAUDE_VERSION` in `src/main/services/claudeCli.ts`; task sessions refuse to start below it), Git. macOS arm64 or Linux x64.

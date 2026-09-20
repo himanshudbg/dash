@@ -262,6 +262,27 @@ export class DatabaseService {
     return this.mapTask(row!);
   }
 
+  /**
+   * Record a worktree move (WorktreeMigrationService). `previousPath` keeps the
+   * first pre-move location: a task moved twice still points at the oldest
+   * transcript dir, and the intermediate one is a subdirectory of neither.
+   */
+  static relocateTask(id: string, newPath: string, previousPath: string): Task {
+    const db = getDb();
+    const current = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    if (!current) throw new Error(`Task ${id} not found`);
+    db.update(tasks)
+      .set({
+        path: newPath,
+        previousPath: current.previousPath ?? previousPath,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(tasks.id, id))
+      .run();
+    const row = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    return this.mapTask(row!);
+  }
+
   static updateTaskTokenStats(
     id: string,
     stats: { totalTokens: number; totalCostUsd: number },
@@ -312,10 +333,14 @@ export class DatabaseService {
     };
   }
 
-  static listTasksNeedingBackfill(): Array<{ id: string; path: string }> {
+  static listTasksNeedingBackfill(): Array<{
+    id: string;
+    path: string;
+    previousPath: string | null;
+  }> {
     const db = getDb();
     return db
-      .select({ id: tasks.id, path: tasks.path })
+      .select({ id: tasks.id, path: tasks.path, previousPath: tasks.previousPath })
       .from(tasks)
       .where(isNull(tasks.tokensBackfilledAt))
       .all();
@@ -536,6 +561,7 @@ export class DatabaseService {
       contextPrompt: row.contextPrompt ?? null,
       setupScript: row.setupScript ?? null,
       teardownScript: row.teardownScript ?? null,
+      previousPath: row.previousPath ?? null,
       archivedAt: row.archivedAt,
       sortOrder: row.sortOrder,
       totalTokens: row.totalTokens ?? 0,

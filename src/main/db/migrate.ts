@@ -326,5 +326,15 @@ export function runMigrations(): void {
     /* already exists */
   }
 
+  // Worktrees moved from `<parent>/worktrees/` to `<repo>/.claude/worktrees/`
+  // in 0.16. When the launch dialog moves a task, its old path is kept here so
+  // the Claude transcripts written under the old cwd (~/.claude/projects/<encoded
+  // old path>) still count for resume and token totals.
+  try {
+    rawDb.exec(`ALTER TABLE tasks ADD COLUMN previous_path TEXT`);
+  } catch {
+    /* already exists */
+  }
+
   rawDb.pragma('foreign_keys = ON');
 }

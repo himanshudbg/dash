@@ -22,7 +22,20 @@ import { activityMonitor } from '../services/ActivityMonitor';
 import { contextUsageService } from '../services/ContextUsageService';
 import { remoteControlService } from '../services/remoteControlService';
 import { TelemetryService } from '../services/TelemetryService';
+import { describeUnsupportedClaude } from '../services/claudeCli';
+import { IpcError } from './ipcErrors';
 import type { PermissionMode } from '@shared/types';
+
+/**
+ * Await the startup `claude --version` probe and throw an `UNSUPPORTED_CLI`
+ * IpcError when the CLI is missing or older than MIN_CLAUDE_VERSION.
+ */
+async function requireSupportedClaude(): Promise<void> {
+  const main = await import('../main');
+  await main.detectClaudeCli();
+  const reason = describeUnsupportedClaude(main.claudeCliCache);
+  if (reason) throw new IpcError(reason, 'UNSUPPORTED_CLI');
+}
 
 export function registerPtyIpc(): void {
   ipcMain.handle(
@@ -51,6 +64,12 @@ export function registerPtyIpc(): void {
           }),
           args,
         );
+        // Hard floor: refuse to start a task session on a missing or too-old
+        // CLI. The renderer normally never gets here (MainContent gates on
+        // detectClaude), so this is the defense in depth that keeps a stale
+        // renderer from falling back to a shell in the task pane.
+        await requireSupportedClaude();
+
         // The agent PTY id is the bare task id — look up its name and model so a
         // fresh spawn gets `claude --name <task>` (recognizable in /resume +
         // title) and `--model <alias>` (the user's per-task model choice). Read
@@ -61,6 +80,7 @@ export function registerPtyIpc(): void {
           ...args,
           name: task?.name,
           model: task?.model,
+          previousPath: task?.previousPath,
           sender: event.sender,
         });
         TelemetryService.capture('terminal_started', { source: 'direct' });

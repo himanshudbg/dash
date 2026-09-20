@@ -34,7 +34,7 @@ Download the latest build from [Releases](https://github.com/syv-ai/dash/release
 
 - Node.js 22+
 - [pnpm](https://pnpm.io/)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) 2.1.257 or newer (`npm install -g @anthropic-ai/claude-code`, then `claude update`)
 - Git
 
 ## Development setup
@@ -166,7 +166,7 @@ All keybindings are customizable in Settings > Keybindings.
 
 - **Database**: `~/Library/Application Support/Dash/app.db` (macOS)
 - **Terminal snapshots**: `~/Library/Application Support/Dash/terminal-snapshots/`
-- **Worktrees**: `{project}/../worktrees/{task-slug}/`
+- **Worktrees**: `{project}/.claude/worktrees/{task-slug}-{hash}/` (ignored via `.git/info/exclude`; pre-0.16 tasks at `{project}/../worktrees/` are offered a one-time move at launch)
 
 ## Acknowledgements
 

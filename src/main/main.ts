@@ -197,7 +197,25 @@ export let claudeCliCache: { installed: boolean; version: string | null; path: s
   path: null,
 };
 
-async function detectClaudeCli(): Promise<void> {
+let claudeCliDetection: Promise<void> | null = null;
+
+/**
+ * Probe `claude --version` once and cache the result. Memoised so the task
+ * spawn gate (pty:startDirect) and the settings UI can `await` the same probe
+ * instead of racing the fire-and-forget call at the end of startup.
+ */
+export function detectClaudeCli(): Promise<void> {
+  if (!claudeCliDetection) claudeCliDetection = probeClaudeCli();
+  return claudeCliDetection;
+}
+
+/** Re-run the probe (after the user installs or updates the CLI). */
+export function redetectClaudeCli(): Promise<void> {
+  claudeCliDetection = probeClaudeCli();
+  return claudeCliDetection;
+}
+
+async function probeClaudeCli(): Promise<void> {
   try {
     const findCmd = process.platform === 'win32' ? 'where.exe' : 'which';
     const { stdout } = await execFileAsync(findCmd, ['claude']);

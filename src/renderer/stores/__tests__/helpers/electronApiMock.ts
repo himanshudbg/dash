@@ -49,6 +49,16 @@ export function makeElectronApiMock(overrides: Record<string, unknown> = {}) {
       ok({ totalTokens: 0, totalCostUsd: 0, taskCount: 0 }),
     ),
     rtkGetStatus: vi.fn(() => ok({ installed: false, downloadable: false })),
+    detectClaude: vi.fn(() =>
+      ok({
+        installed: true,
+        version: '2.1.278 (Claude Code)',
+        path: '/usr/local/bin/claude',
+        minVersion: '2.1.257',
+        supported: true,
+        unsupportedReason: null,
+      }),
+    ),
     rtkSetEnabled: vi.fn(() => ok({})),
     rtkDownload: vi.fn(() => ok({})),
     onRtkDownloadProgress: vi.fn((_cb: (p: unknown) => void) => () => {}),

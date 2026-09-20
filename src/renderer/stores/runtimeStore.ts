@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import type {
   ActivityInfo,
+  ClaudeCliInfo,
   RemoteControlState,
   RtkStatus,
   RtkDownloadProgress,
@@ -26,10 +27,15 @@ export interface RuntimeState {
   globalTokenStats: TokenStatsRollup;
   rtkStatus: RtkStatus | null;
   rtkDownloadProgress: RtkDownloadProgress | null;
+  /** Startup `claude --version` probe; null until it answers. MainContent gates
+   *  the task terminal on `supported`. */
+  claudeCli: ClaudeCliInfo | null;
 }
 
 export interface RuntimeActions {
   refreshTokenRollups: () => Promise<void>;
+  /** Re-read the CLI probe; `refresh` re-runs `claude --version` in main. */
+  refreshClaudeCli: (opts?: { refresh?: boolean }) => Promise<void>;
   enableRtk: (enabled: boolean) => Promise<void>;
   downloadRtk: () => Promise<void>;
   /** Wire every live IPC subscription; returns a combined cleanup. */
@@ -45,6 +51,13 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
   globalTokenStats: { totalTokens: 0, totalCostUsd: 0, taskCount: 0 },
   rtkStatus: null,
   rtkDownloadProgress: null,
+  claudeCli: null,
+
+  refreshClaudeCli: async (opts) => {
+    const resp = await window.electronAPI.detectClaude(opts);
+    if (resp.success && resp.data) set({ claudeCli: resp.data });
+    else console.warn('[detectClaude] failed:', resp.error);
+  },
 
   refreshTokenRollups: async () => {
     const { projects } = useProjects.getState();
@@ -222,6 +235,11 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
         unsub();
       });
     }
+
+    // ── Claude CLI floor ───────────────────────────────────
+    void get()
+      .refreshClaudeCli()
+      .catch((err) => console.warn('[detectClaude] failed:', err));
 
     return () => cleanups.forEach((fn) => fn());
   },

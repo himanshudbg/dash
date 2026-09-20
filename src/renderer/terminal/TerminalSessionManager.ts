@@ -1044,7 +1044,15 @@ export class TerminalSessionManager {
     } else {
       const isNativeModuleError = resp.error?.includes('[native module]');
 
-      if (isNativeModuleError) {
+      if (resp.code === 'UNSUPPORTED_CLI') {
+        // Missing or too-old Claude Code. MainContent normally renders the
+        // ClaudeCliGate panel instead of mounting this terminal at all; if we
+        // still got here, say why and stay put — a shell in the task pane
+        // would hide the real problem.
+        this.terminal.write(
+          clackBlock('error', 'Cannot start the task session.', resp.error ?? 'Unsupported CLI'),
+        );
+      } else if (isNativeModuleError) {
         // node-pty itself failed — shell fallback won't work either
         this.terminal.write(
           clackBlock(

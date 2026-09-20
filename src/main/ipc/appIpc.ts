@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
+import type { ClaudeCliInfo } from '@shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -417,18 +418,27 @@ export function registerAppIpc(): void {
     })();
   });
 
-  ipcMain.handle('app:detectClaude', async () => {
+  ipcMain.handle('app:detectClaude', async (_event, args?: { refresh?: boolean }) => {
     try {
-      // Import cached result from main
-      const { claudeCliCache } = await import('../main');
-      return { success: true, data: claudeCliCache };
+      const main = await import('../main');
+      // Await the startup probe so an early call can't observe the pre-probe
+      // "not installed" placeholder; `refresh` re-runs it after an install/update.
+      if (args?.refresh) await main.redetectClaudeCli();
+      else await main.detectClaudeCli();
+      const { describeUnsupportedClaude, MIN_CLAUDE_VERSION } =
+        await import('../services/claudeCli');
+      const cache = main.claudeCliCache;
+      const unsupportedReason = describeUnsupportedClaude(cache);
+      const data: ClaudeCliInfo = {
+        ...cache,
+        minVersion: MIN_CLAUDE_VERSION,
+        supported: unsupportedReason === null,
+        unsupportedReason,
+      };
+      return { success: true, data };
     } catch (error) {
       console.error('[app:detectClaude] Failed to import main module:', error);
-      return {
-        success: false,
-        error: String(error),
-        data: { installed: false, version: null, path: null },
-      };
+      return errorResponse(error);
     }
   });
 

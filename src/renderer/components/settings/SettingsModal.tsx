@@ -47,6 +47,7 @@ import { TERMINAL_FONTS, resolveTerminalFontValue } from '../../terminal/termina
 import { Select } from '../ui/Select';
 import { Segmented } from '../ui/Segmented';
 import type {
+  ClaudeCliInfo,
   RateLimits,
   RtkStatus,
   RtkDownloadProgress,
@@ -531,11 +532,7 @@ function ThresholdInputInline({
   );
 }
 
-function ClaudeCodeTab({
-  claudeInfo,
-}: {
-  claudeInfo: { installed: boolean; version: string | null; path: string | null } | null;
-}) {
+function ClaudeCodeTab({ claudeInfo }: { claudeInfo: ClaudeCliInfo | null }) {
   const effortLevel = useSettings((s) => s.effortLevel);
   const onEffortLevelChange = useSettings((s) => s.setEffortLevel);
   const syncShellEnv = useSettings((s) => s.syncShellEnv);
@@ -572,12 +569,12 @@ function ClaudeCodeTab({
       >
         <div
           className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-            claudeInfo?.installed
+            claudeInfo?.supported
               ? 'bg-[hsl(var(--git-added)/0.12)] ring-1 ring-[hsl(var(--git-added))/0.25]'
               : 'bg-[hsl(var(--git-modified)/0.12)] ring-1 ring-[hsl(var(--git-modified))/0.25]'
           }`}
         >
-          {claudeInfo?.installed ? (
+          {claudeInfo?.supported ? (
             <Check size={15} className="text-[hsl(var(--git-added))]" strokeWidth={1.8} />
           ) : (
             <AlertCircle size={15} className="text-[hsl(var(--git-modified))]" strokeWidth={1.8} />
@@ -586,8 +583,18 @@ function ClaudeCodeTab({
         <div className="min-w-0 flex-1">
           {claudeInfo?.installed ? (
             <>
-              <p className="text-[12.5px] font-medium text-foreground">Claude Code detected</p>
+              <p className="text-[12.5px] font-medium text-foreground">
+                {claudeInfo.supported ? 'Claude Code detected' : 'Claude Code needs an update'}
+              </p>
               <p className="text-[11px] text-foreground/55 font-mono mt-1">{claudeInfo.version}</p>
+              {!claudeInfo.supported && (
+                <p className="text-[11px] text-foreground/55 leading-relaxed mt-1">
+                  Dash requires {claudeInfo.minVersion} or newer. Run{' '}
+                  <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/75">
+                    claude update
+                  </code>
+                </p>
+              )}
               <p className="text-[10.5px] text-foreground/40 font-mono truncate">
                 {claudeInfo.path}
               </p>
@@ -761,11 +768,7 @@ export function SettingsModal({
       ? (initialTab as SettingsTab)
       : 'sidebar',
   );
-  const [claudeInfo, setClaudeInfo] = useState<{
-    installed: boolean;
-    version: string | null;
-    path: string | null;
-  } | null>(null);
+  const [claudeInfo, setClaudeInfo] = useState<ClaudeCliInfo | null>(null);
   const [appVersion, setAppVersion] = useState('');
   const [claudeDefaultAttribution, setClaudeDefaultAttribution] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<

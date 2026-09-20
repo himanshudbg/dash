@@ -62,6 +62,10 @@ export const tasks = sqliteTable(
     // SessionStart hook before we switched to `claude --continue`. Column kept
     // to avoid a destructive migration. Do not read or write.
     lastSessionId: text('last_session_id'),
+    // Pre-migration worktree path (0.16 moved worktrees under `<repo>/.claude/`).
+    // Null for tasks created at the current location or never moved. Read by
+    // session resume + token aggregation, which look in both transcript dirs.
+    previousPath: text('previous_path'),
     archivedAt: text('archived_at'),
     sortOrder: integer('sort_order').notNull().default(0),
     totalTokens: integer('total_tokens').notNull().default(0),

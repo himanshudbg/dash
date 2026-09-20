@@ -45,24 +45,33 @@ export function pickLatestSessionId(
  * Resolve the most recent Claude session id for a cwd, or null if Claude has
  * no jsonl history there yet. Used to pin `--resume <id>` instead of the
  * undocumented `--continue` "most recent" guess.
+ *
+ * `previousPath` is the task's pre-migration worktree location (Task.previousPath).
+ * Claude keys transcripts by the cwd a session started in and keeps writing a
+ * resumed session under that original dir, so after a `git worktree move` the
+ * newest file can live under either encoding; both dirs are searched and the
+ * newest mtime wins, exactly as within one dir.
  */
-export function findLatestSessionId(cwd: string): string | null {
-  const projDir = findClaudeProjectDir(cwd);
-  if (!projDir) return null;
-  try {
-    const files = fs.readdirSync(projDir).map((name) => {
-      let mtimeMs = 0;
-      try {
-        mtimeMs = fs.statSync(path.join(projDir, name)).mtimeMs;
-      } catch {
-        // Vanished between readdir and stat — treat as oldest; benign race.
+export function findLatestSessionId(cwd: string, previousPath?: string | null): string | null {
+  const files: Array<{ name: string; mtimeMs: number }> = [];
+  for (const dirCwd of previousPath ? [cwd, previousPath] : [cwd]) {
+    const projDir = findClaudeProjectDir(dirCwd);
+    if (!projDir) continue;
+    try {
+      for (const name of fs.readdirSync(projDir)) {
+        let mtimeMs = 0;
+        try {
+          mtimeMs = fs.statSync(path.join(projDir, name)).mtimeMs;
+        } catch {
+          // Vanished between readdir and stat — treat as oldest; benign race.
+        }
+        files.push({ name, mtimeMs });
       }
-      return { name, mtimeMs };
-    });
-    return pickLatestSessionId(files);
-  } catch {
-    return null;
+    } catch {
+      // Unreadable dir — treat as empty.
+    }
   }
+  return pickLatestSessionId(files);
 }
 
 // Cached Claude CLI path
@@ -140,30 +149,90 @@ export async function findClaudePath(): Promise<string | null> {
 }
 
 /**
+ * Oldest Claude Code Dash runs task sessions on. Chosen for the session
+ * supervisor (`claude --bg` / `claude attach` / `claude agents --json`) plus
+ * the worktree-aware resume and reply features that landed by 2.1.257; see
+ * docs/specs/2026-09-20-claude-code-supervisor-sessions.md §6.1. Every hook
+ * event Dash writes (PostCompact, StopFailure, …) predates this floor, so the
+ * per-event version gates that guarded older CLIs (GH #127) are gone.
+ */
+export const MIN_CLAUDE_VERSION = '2.1.257';
+
+export type ParsedVersion = readonly [major: number, minor: number, patch: number];
+
+/**
+ * Parse the leading `M.m.p` of a `claude --version` string ("2.1.278 (Claude
+ * Code)"). Null for anything that doesn't start with three dotted numbers.
+ */
+export function parseClaudeVersion(version: string | null | undefined): ParsedVersion | null {
+  if (!version) return null;
+  const m = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/** Standard semver-style ordering on the parsed triple: -1, 0 or 1. */
+export function compareClaudeVersions(a: ParsedVersion, b: ParsedVersion): -1 | 0 | 1 {
+  for (let i = 0; i < 3; i++) {
+    if (a[i]! !== b[i]!) return a[i]! < b[i]! ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Pure floor check. Unknown/unparseable versions fail — the caller decides
+ * whether that means "block" (task spawn) or "can't tell yet" (settings UI).
+ */
+export function versionMeetsMinimum(
+  version: string | null | undefined,
+  minimum: string = MIN_CLAUDE_VERSION,
+): boolean {
+  const parsed = parseClaudeVersion(version);
+  const min = parseClaudeVersion(minimum);
+  if (!parsed || !min) return false;
+  return compareClaudeVersions(parsed, min) >= 0;
+}
+
+/**
+ * Human-readable reason a task session can't start on this install, or null
+ * when the CLI is present and new enough. Shared by the IPC refusal and the
+ * renderer's gate panel so the two never disagree on wording.
+ */
+export function describeUnsupportedClaude(cache: {
+  installed: boolean;
+  version: string | null;
+}): string | null {
+  if (!cache.installed) {
+    return 'Claude Code CLI not found. Install with: npm install -g @anthropic-ai/claude-code';
+  }
+  if (versionMeetsMinimum(cache.version)) return null;
+  const detected = parseClaudeVersion(cache.version)?.join('.') ?? cache.version ?? 'unknown';
+  return `Claude Code ${MIN_CLAUDE_VERSION} or newer is required (found ${detected}). Run: claude update`;
+}
+
+function readCachedVersion(): string | null {
+  try {
+    // Lazy require to avoid the circular import that a static import of main.ts
+    // would create (main → ptyManager → claudeCli → main). At call time, main
+    // is fully loaded.
+    const main = require('../main') as typeof import('../main');
+    return main.claudeCliCache.version;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Claude Code rejects an entire settings.local.json if any top-level hook key
- * is unknown to the running CLI version. Newer hook events must be gated so
- * older Claude Code installs don't lose ALL Dash hooks (see GH #127).
+ * is unknown to the running CLI version, so a hook event newer than
+ * MIN_CLAUDE_VERSION must still be gated here (GH #127).
  *
  * Returns false when the version is unknown, which keeps the new keys out of
  * the file — the safer default. main.ts populates claudeCliCache after the
  * async --version probe; by the time a PTY spawns, it's almost always set.
  */
 export function isClaudeVersionAtLeast(major: number, minor: number, patch: number): boolean {
-  let version: string | null = null;
-  try {
-    // Lazy require to avoid the circular import that a static import of main.ts
-    // would create (main → ptyManager → claudeCli → main). At call time, main
-    // is fully loaded.
-    const main = require('../main') as typeof import('../main');
-    version = main.claudeCliCache.version;
-  } catch {
-    return false;
-  }
-  if (!version) return false;
-  const m = version.match(/^(\d+)\.(\d+)\.(\d+)/);
-  if (!m) return false;
-  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  if (a !== major) return a > major;
-  if (b !== minor) return b > minor;
-  return c >= patch;
+  const parsed = parseClaudeVersion(readCachedVersion());
+  if (!parsed) return false;
+  return compareClaudeVersions(parsed, [major, minor, patch]) >= 0;
 }

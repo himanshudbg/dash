@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('worktree:createFromExisting', args),
   worktreeEnsureReserve: (args: unknown) => ipcRenderer.invoke('worktree:ensureReserve', args),
   worktreeHasReserve: (projectId: string) => ipcRenderer.invoke('worktree:hasReserve', projectId),
+  worktreeMigrationPlan: () => ipcRenderer.invoke('worktree:migrationPlan'),
+  worktreeMigrate: (args: unknown) => ipcRenderer.invoke('worktree:migrate', args),
 
   // PTY
   ptyStartDirect: (args: unknown) => ipcRenderer.invoke('pty:startDirect', args),
@@ -277,7 +279,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Git detection
   detectGit: (folderPath: string) => ipcRenderer.invoke('app:detectGit', folderPath),
   gitInit: (folderPath: string) => ipcRenderer.invoke('git:init', folderPath),
-  detectClaude: () => ipcRenderer.invoke('app:detectClaude'),
+  detectClaude: (args?: { refresh?: boolean }) => ipcRenderer.invoke('app:detectClaude', args),
 
   // Workspace config (.dash/config.json)
   readWorkspaceConfig: (projectPath: string) =>

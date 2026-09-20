@@ -45,11 +45,7 @@ export class WorktreePoolService {
     try {
       const hash = crypto.randomBytes(3).toString('hex');
       const branchName = `${RESERVE_PREFIX}/${hash}`;
-      const worktreesDir = worktreeService.getWorktreesDir(projectPath);
-
-      if (!fs.existsSync(worktreesDir)) {
-        fs.mkdirSync(worktreesDir, { recursive: true });
-      }
+      const worktreesDir = await worktreeService.ensureWorktreesDir(projectPath);
 
       const reservePath = path.join(worktreesDir, `${RESERVE_PREFIX}-${hash}`);
 
@@ -212,13 +208,19 @@ export class WorktreePoolService {
       const projects = DatabaseService.getProjects();
 
       for (const project of projects) {
-        const worktreesDir = worktreeService.getWorktreesDir(project.path);
-        if (!fs.existsSync(worktreesDir)) continue;
+        // Sweep the current dir and the pre-0.16 sibling dir: a reserve left
+        // behind at the old location by an older Dash holds no work.
+        const worktreeDirs = [
+          worktreeService.getWorktreesDir(project.path),
+          worktreeService.getLegacyWorktreesDir(project.path),
+        ].filter((dir) => fs.existsSync(dir));
+        if (worktreeDirs.length === 0) continue;
 
         const activeReservePaths = new Set([...this.reserves.values()].map((r) => r.path));
-        const entries = fs.readdirSync(worktreesDir);
-        for (const entry of entries) {
-          if (entry.startsWith(`${RESERVE_PREFIX}-`)) {
+        for (const worktreesDir of worktreeDirs) {
+          const entries = fs.readdirSync(worktreesDir);
+          for (const entry of entries) {
+            if (!entry.startsWith(`${RESERVE_PREFIX}-`)) continue;
             const reservePath = path.join(worktreesDir, entry);
             if (activeReservePaths.has(reservePath)) continue;
             try {

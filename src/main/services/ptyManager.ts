@@ -409,6 +409,9 @@ export async function startDirectPty(options: {
   isDark?: boolean;
   /** Task name → `claude --name` on a fresh spawn (recognizable in /resume). */
   name?: string;
+  /** Pre-migration worktree path (Task.previousPath); its transcript dir is
+   *  searched too when picking the session to resume. */
+  previousPath?: string | null;
   sender?: WebContents;
 }): Promise<{
   reattached: boolean;
@@ -451,7 +454,7 @@ export async function startDirectPty(options: {
   //
   // DO NOT relax the one-non-worktree-task cap without revisiting this; see git
   // history at 32bcdb6 for why the old SessionStart-hook pinning was removed.
-  const resumeSessionId = findLatestSessionId(options.cwd);
+  const resumeSessionId = findLatestSessionId(options.cwd, options.previousPath);
 
   // Pre-loaded prompt (the inlined ports-setup body). Only present for the
   // ports-migrate flow today; no-op for every other spawn. buildClaudeArgs

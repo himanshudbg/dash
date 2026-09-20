@@ -4,7 +4,6 @@ import { BrowserWindow } from 'electron';
 import { hookServer } from './HookServer';
 import { RtkService } from './RtkService';
 import { DatabaseService } from './DatabaseService';
-import { isClaudeVersionAtLeast } from './claudeCli';
 import {
   type Hook,
   type HookEntry,
@@ -205,19 +204,15 @@ export function writeHookSettings(cwd: string, ptyId: string): HookWriteResult {
     PreToolUse: buildPreToolUseHooks(dashCmd),
     PostToolUse: [{ matcher: '*', hooks: [dashCmd('tool-end', true)] }],
     PreCompact: [{ matcher: '*', hooks: [dashCmd('compact-start', true)] }],
+    // PostCompact (2.1.76) and StopFailure (2.1.78) used to be gated on the
+    // CLI version because an unknown hook key makes Claude Code drop the whole
+    // settings file (GH #127). Both predate MIN_CLAUDE_VERSION, so they're
+    // unconditional now; gate any hook newer than the floor with
+    // isClaudeVersionAtLeast the same way.
+    PostCompact: [{ matcher: '*', hooks: [dashCmd('compact-end', true)] }],
+    StopFailure: [{ matcher: '*', hooks: [dashCmd('stop-failure')] }],
     SessionEnd: [{ matcher: '*', hooks: [dashCmd('session-end', true)] }],
   };
-
-  // PostCompact added in Claude Code 2.1.76; older CLIs reject the key and
-  // skip the entire settings file (GH #127), losing all Dash hooks.
-  if (isClaudeVersionAtLeast(2, 1, 76)) {
-    dashEntries.PostCompact = [{ matcher: '*', hooks: [dashCmd('compact-end', true)] }];
-  }
-
-  // StopFailure added in Claude Code 2.1.78.
-  if (isClaudeVersionAtLeast(2, 1, 78)) {
-    dashEntries.StopFailure = [{ matcher: '*', hooks: [dashCmd('stop-failure')] }];
-  }
 
   // SessionStart(clear|compact) → defensive idle. /clear and auto-compact
   // reset the session, so any prior busy state on the activity dot is stale.
