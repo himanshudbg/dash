@@ -1,6 +1,6 @@
 # Plan: run Dash task sessions under Claude Code's session supervisor
 
-Status: proposal, awaiting spike results (§4) before phase 1 is scheduled.
+Status: spikes run (§4.1), plan adjusted; ready to schedule phase 1.
 Written against Dash v0.15.1 and Claude Code 2.1.278 (docs as of 2026-09-20).
 
 ## 1. Decision summary
@@ -138,8 +138,46 @@ Each spike has a pass condition and the fallback the plan takes if it fails.
 | S6 | Worktree under `<repo>/.claude/worktrees/`: a Dash-created linked worktree is not re-isolated by a `--bg` session; `.git/info/exclude` hides it from `git status` in the main checkout; `git worktree move` from the old location works with the reserve pool and locked worktrees. | All true. | If exclude is not honoured for some setup, append to the repo `.gitignore` behind a confirmation. |
 | S7 | Haiku summaries: is the per-session summary cost visible in `/cost` or the transcript, and does it show up in Dash's jsonl aggregation? | Measured and small. | Surface an "includes summary calls" note in the cost tooltip; no code change. |
 
-Spike harness: a throwaway script in `scripts/spikes/supervisor.mjs` that runs
-each step against a scratch repo and prints the JSON it saw. Not shipped.
+### 4.1 Spike results (run 2026-09-20 against Claude Code 2.1.278, Linux)
+
+Run in a scratch repo with a Dash-style linked worktree at
+`<repo>/.claude/worktrees/task-a`, hooks written to that worktree's
+`.claude/settings.local.json`, and `claude attach` driven through node-pty.
+
+| Id | Result | Consequence for the plan |
+| --- | --- | --- |
+| S1 | **Pass.** `claude --bg --name x` with no prompt starts a session listed as `status: idle, state: blocked` ("idle — send a prompt to start"). `--session-id` is ignored with a warning ("--bg manages the session id"). The short job id is the first 8 hex characters of the session UUID (`5ebbd6cc` ↔ `5ebbd6cc-43bd-…`). | No first-message requirement. Dash parses `backgrounded · <id>` and confirms via the JSON row whose `id` matches; `sessionId` is present immediately. |
+| S2 | **Pass.** Attach inside node-pty enters the alternate screen with mouse tracking and bracketed paste on; typing a prompt and Enter works. `←` on an empty prompt opened agent view in the same PTY (it first showed the workspace-trust dialog for the worktree directory); Esc exited the attach process with code 0. | Matches the decision to let agent view render. A clean exit of the attach PTY means "detached", not "session ended". |
+| S3 | **Pass.** After `claude stop` + `claude respawn` from a shell with a different env, hooks still saw the dispatch-time variable. `state.json` records `respawnFlags` and provider env. A `settings.local.json` `env` map is also applied. | The dispatch env is durable, so the ports and user vars need no settings `env` block. **But** a durable env is exactly why `DASH_HOOK_PORT` cannot stay in the env: Dash's hook server port changes per launch while the session outlives Dash. The port file in §6.5 is required, not optional. |
+| S4 | **Partial.** `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop`, `SessionEnd` and the `statusLine` command all fire for background sessions, with `cwd` = the worktree and `CLAUDE_JOB_DIR` + `CLAUDE_CODE_MESSAGING_SOCKET` in the env. `Notification` matchers `agent_needs_input` and `agent_completed` **never fired** in the session's own hooks. An `AskUserQuestion` produced a `permission_prompt` notification and the JSON row `status: waiting, waitingFor: "input needed", state: blocked`. | Drop the two new matchers from §6.5. "Needs input" comes from the JSON `waitingFor` plus the existing `permission_prompt` hook. |
+| S5 | **Pass.** `claude agents --json --all` takes 0.29 s with four sessions. `fs.watch` (recursive) on `~/.claude/jobs` fires on `state.json` rewrites within a second of a transition. | Watch-triggered refresh with a slow timer fallback, as planned. |
+| S6 | **Pass.** A background session that used the Write tool inside the Dash worktree created no extra worktree; `.git/info/exclude` kept the main checkout's `git status` clean; `claude agents --json --cwd <repo>` lists the worktree sessions; no `git worktree lock` was placed on the Dash worktree. | Layout and isolation rule hold. |
+| S7 | **Measured indirectly.** `state.json` `detail` strings ("spike.txt created with 'hello'") are model-written; the session transcript shows only the main-model calls, so those summary calls are invisible to Dash's jsonl cost aggregation and cannot be counted. | Note in the cost tooltip that per-session summaries are billed outside what Dash counts. |
+
+Extra findings not covered by the table:
+
+- **Migration needs a `claude rm` step.** `claude --bg --resume <sid>` from the
+  moved worktree failed with "working directory no longer exists" as long as
+  the supervisor still held a job record for that session at the old cwd, and
+  it **queued the prompt** for delivery when the job next starts. After
+  `claude rm <jobId>` the same command started the session in the new
+  directory. Pre-supervisor Dash tasks have no job record, so only tasks
+  already dispatched by Dash need the `rm`. §6.2 is updated.
+- **A resumed session loses its name.** `--bg --resume <sid>` with no `--name`
+  got an auto-generated name (`respawnFlags: []`). Dash passes `--name` and
+  the permission flags on every resume dispatch.
+- **Transcripts stay in the old directory** after a move: the resumed session
+  kept writing to `~/.claude/projects/<encoded old path>/`. `previous_path`
+  in §5 is required for token totals.
+- `claude rm` deletes `~/.claude/jobs/<id>` and keeps the transcript;
+  `claude stop` leaves `state: done` without `pid`. Both behave as the plan
+  assumed.
+- A background dispatch into a directory never opened interactively ran
+  without a trust prompt (with `acceptEdits`), while agent view in that
+  directory asked for trust. Dash's existing first-spawn trust handling stays.
+- `state.json` also carries `intent`, `tokens`, `output.result`,
+  `respawnFlags` and a `timeline.jsonl` of state changes. Informational only;
+  the plan keeps reading state through the JSON command.
 
 ## 5. Data model
 
@@ -219,6 +257,9 @@ are the ones to touch; line references are to v0.15.1.
 - Orphan cleanup at boot (`main.ts:176-188`) scans the new directory. Old
   reserves under `<parent>/worktrees/_reserve-*` are removed by the migration
   step (they hold no work by definition).
+- Hooks note: `SessionStart` context injection and the statusLine command
+  fire for background sessions exactly as for direct spawns (S4), so
+  `writeHookSettings` needs no changes beyond §6.5.
 - **Migration dialog** (new `src/main/services/WorktreeMigrationService.ts`,
   IPC `worktree:migrationPlan` / `worktree:migrate`, renderer modal
   `components/project/WorktreeMigrationModal.tsx`):
@@ -231,17 +272,25 @@ are the ones to touch; line references are to v0.15.1.
      paths permanently, which still works because the supervisor does not
      care where a linked worktree lives).
   3. Move, per task, in order: refuse if the task has a live agent PTY;
-     capture `findLatestSessionId(oldPath)` into `last_session_id`; set
-     `previous_path = oldPath`; `git worktree move <old> <new>` from the
-     project path (unlock first if `git worktree lock` is set and the lock
-     reason is Claude Code's); update `tasks.path`; `ensureWorktreesExcluded`.
-     `settings.local.json`, `.dash/` files and the ports export file live
-     inside the worktree and move with it. Task ports are keyed by task id.
-     Errors are collected and shown per task; a failed task stays on its old
-     path and keeps working.
+     capture `findLatestSessionId(oldPath)` into `last_session_id` (the last
+     use of that helper before it is deleted); if the task already has a
+     `job_id`, `claude stop` then **`claude rm <job_id>`** (the supervisor
+     otherwise keeps a job record bound to the old cwd and every later
+     `--bg --resume` fails with "working directory no longer exists", see
+     §4.1); set `previous_path = oldPath`; `git worktree move <old> <new>`
+     from the project path (unlock first if `git worktree lock` is set and the
+     lock reason is Claude Code's); update `tasks.path`;
+     `ensureWorktreesExcluded`. `settings.local.json`, `.dash/` files and the
+     ports export file live inside the worktree and move with it. Task ports
+     are keyed by task id. Errors are collected and shown per task; a failed
+     task stays on its old path and keeps working.
   4. On the first open of a migrated task, `SupervisorService.dispatch`
-     passes `--resume <last_session_id>` (resume by id searches all projects
-     on the machine) so the conversation continues in the new location.
+     passes `--resume <last_session_id>` together with `--name <task>` and
+     the permission and model flags (a resume without them gets an
+     auto-generated name and no flags, see §4.1), so the conversation
+     continues in the new location. The transcript keeps being written under
+     the old encoded directory, which is why `previous_path` feeds token
+     aggregation.
 - Token aggregation (`src/main/utils/taskTokenAggregator.ts:21`) takes a list
   of paths; `TokenStatsService` passes `[path, previous_path]`. Transcripts
   written before the move stay under the old encoded directory.
@@ -271,13 +320,18 @@ startPolling(): void;        // §6.6
 - `dispatch` builds args with a supervisor variant of `buildClaudeArgs`
   (`ptyManager.ts:364-399`): `--bg`, `--name <task>`, permission flags,
   `--model`, `--settings '{"ultracode":true}'` when on, `--resume <id>` for
-  migrated or re-dispatched tasks, then the prompt as the last positional
-  (S1 decides whether the prompt is optional). Env = `buildDirectEnv(cwd)`
-  moved out of `ptyManager` into `src/main/services/claudeEnv.ts` so both the
-  dispatch and the attach PTY share it.
-- Parse stdout with `/^backgrounded · (\S+) · /m`. Then poll `list({cwd})`
-  (up to ~5 s) until the row with that `id` carries `sessionId`; store both on
-  the task (`DatabaseService.setTaskSession(taskId, jobId, sessionId)`).
+  migrated or re-dispatched tasks, then an optional prompt as the last
+  positional. No prompt is needed for a fresh task (S1). `--session-id` is
+  ignored by `--bg` and is not passed. Env = `buildDirectEnv(cwd)` moved out
+  of `ptyManager` into `src/main/services/claudeEnv.ts` so both the dispatch
+  and the attach PTY share it.
+- Parse stdout with `/^backgrounded · ([0-9a-f]{8})/m`. The job id is the
+  first 8 characters of the session UUID (S1), so one `list({cwd})` call
+  right after dispatch yields the matching row and its `sessionId`; store
+  both (`DatabaseService.setTaskSession(taskId, jobId, sessionId)`). A
+  dispatch that prints "Couldn't start a background session" has still
+  queued the prompt on the job; treat it as failed and never retry with the
+  same prompt.
 - `claude agents --json` output is validated with a zod schema in
   `src/main/ipc/schemas.ts` (loose object; unknown fields ignored) so a
   research-preview field change degrades to "unknown" instead of crashing.
@@ -328,32 +382,35 @@ startPolling(): void;        // §6.6
 `src/main/services/ptyHookSettings.ts`:
 
 - The hook command currently reads `$DASH_HOOK_PORT` from the process env
-  (`:178-184`). Replace with a port file so hooks work after the supervisor
-  restarts a session with a different env (S3) and no-op when Dash is not
-  running:
+  (`:178-184`). That breaks under the supervisor: the dispatch env is frozen
+  into the job and reused on every respawn (S3), while Dash binds a new
+  ephemeral port each launch and the session outlives Dash. Replace it with a
+  port file:
   `P=$(cat "<userData>/hook-port" 2>/dev/null) || exit 0; [ -n "$P" ] || exit 0; curl -s --max-time 2 ... "http://127.0.0.1:$P/hook/<ep>?ptyId=<taskId>" >/dev/null 2>&1; exit 0`.
   `HookServer.start` writes the file; `before-quit` and a stale-file check at
-  boot remove it. `DASH_HOOK_PORT` env stays as a fast path for one release,
-  then goes.
-- Add `Notification` matchers `agent_needs_input` → `/hook/notification`
-  (treated like `permission_prompt`: `setWaitingForPermission` + desktop
-  notification) and `agent_completed` → `/hook/stop` (idle + notification).
-  Extend `DashHookEvent`/`hookSettingsMerge.ts` lists accordingly.
-- `settings.local.json` gains an `env` object with the per-worktree port vars
-  (`WorkspacePortsRuntime.getEnvForWorktree`) and the user's custom vars
-  minus `RESERVED_ENV_KEYS`, written by the same `writeHookSettings` merge and
-  refreshed by `refreshActivePtyHooks`. Only if S3 fails; otherwise the
-  dispatch env suffices and this is skipped.
-- `CLAUDE_CODE_NO_FLICKER` stays unless S2 shows fullscreen mode ignores it.
+  boot remove it. Sessions running while Dash is closed no-op; the first Dash
+  launch afterwards reconciles from the JSON listing (§6.6). Drop
+  `DASH_HOOK_PORT` from `buildDirectEnv` and `RESERVED_ENV_KEYS`.
+- No new `Notification` matchers: `agent_needs_input` and `agent_completed`
+  did not fire in the session's own hooks (S4). "Needs input" is derived from
+  the JSON `waitingFor` and the existing `permission_prompt` hook, which
+  `AskUserQuestion` also triggers.
+- No settings `env` block is needed: per-worktree port vars and user vars in
+  the dispatch env persist across respawns (S3). Changing a task's ports
+  after dispatch therefore needs a re-dispatch (`stop` + `rm` + `--bg --resume`),
+  which `WorkspacePortsRuntime` triggers through `SupervisorService` when the
+  task's PTY is not busy; otherwise it queues the change for the next open.
+- `CLAUDE_CODE_NO_FLICKER` stays; attach rendered correctly with it set (S2).
 
 ### 6.6 Activity: hooks plus supervisor state
 
 `src/main/services/ActivityMonitor.ts`, `SupervisorService.startPolling`:
 
-- Polling: `list({ all: true })` on a 10 s timer while the window is focused,
-  60 s blurred, plus immediately on focus, `powerMonitor` resume, after each
-  dispatch/stop, and when an `fs.watch` on `~/.claude/jobs` fires (debounced
-  1 s; the watch is a trigger only, S5).
+- Polling: `list({ all: true })` (0.3 s per call, S5) on a 15 s timer while
+  the window is focused, 60 s blurred, plus immediately on focus,
+  `powerMonitor` resume, after each dispatch/stop, and when a recursive
+  `fs.watch` on `~/.claude/jobs` fires (debounced 1 s; the watch is a trigger
+  only and its payload is never read).
 - Mapping onto `ActivityState`, applied per task by `job_id`:
 
   | Supervisor | Dash |
@@ -440,7 +497,7 @@ startPolling(): void;        // §6.6
 
 | Step | Depends on | Size |
 | --- | --- | --- |
-| Spikes S1–S7 | – | 2 days |
+| Spikes S1–S7 | done (§4.1) | – |
 | 6.1 version floor | – | 0.5 day |
 | 6.2 relocation + migration | 6.1 | 2 days |
 | 6.3 SupervisorService | S1, S5 | 1.5 days |
@@ -487,9 +544,14 @@ Not scheduled; listed so phase 1 does not paint us in.
   will show `stopped`; attaching resumes it with a recap. Users may read this
   as "Dash lost my session". The `stopped` state copy must say it resumes on
   click.
-- **Dispatch prompt.** If S1 fails, every new task needs a first message,
-  which changes the New Task flow.
-- **Quota.** Row summaries add Haiku calls per running session; S7 measures.
+- **Quota.** Row summaries and auto names are model calls outside the
+  session transcript, so Dash's cost totals undercount them (S7). Small per
+  session, but present for every running session.
+- **Frozen dispatch env.** The supervisor reuses the dispatch-time env on
+  every respawn (S3). Anything Dash injects at dispatch (ports, user env,
+  effort level) is stale after the user changes it until the task is
+  re-dispatched. Phase 1 handles ports (§6.5); other settings changes show a
+  "takes effect on next re-dispatch" note.
 - **Windows.** Dash has a `package:win` target but ships macOS and Linux;
   supervisor support on Windows is undocumented. Windows stays unsupported
   for the agent PTY until verified.
