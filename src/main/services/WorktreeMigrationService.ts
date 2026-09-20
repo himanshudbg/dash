@@ -36,7 +36,11 @@ class WorktreeMigrationServiceImpl {
     const tasksByProject = Object.fromEntries(
       projects.map((p) => [p.id, DatabaseService.getTasks(p.id)] as const),
     );
-    return buildMigrationPlan(projects, tasksByProject, worktreeService);
+    return buildMigrationPlan(projects, tasksByProject, {
+      getLegacyWorktreesDir: (p) => worktreeService.getLegacyWorktreesDir(p),
+      getWorktreesDir: (p) => worktreeService.getWorktreesDir(p),
+      pathExists: (p) => fs.existsSync(p),
+    });
   }
 
   async migrateProject(projectId: string): Promise<WorktreeMigrationResult> {

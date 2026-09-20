@@ -10,6 +10,10 @@ import type { Project, Task, WorktreeMigrationProject } from '@shared/types';
 export interface MigrationPathHelpers {
   getLegacyWorktreesDir: (projectPath: string) => string;
   getWorktreesDir: (projectPath: string) => string;
+  /** Directory existence check (fs.existsSync in production). A task whose
+   *  worktree is gone from both locations has nothing to move and is left
+   *  out, so a stale task row never blocks or re-triggers the dialog. */
+  pathExists?: (p: string) => boolean;
 }
 
 /** True when `candidate` is strictly inside `dir` (not equal, not a sibling). */
@@ -34,6 +38,7 @@ export function buildMigrationPlan(
     if (project.isGitRepo === false) continue;
     const legacyDir = helpers.getLegacyWorktreesDir(project.path);
     const targetDir = helpers.getWorktreesDir(project.path);
+    const exists = helpers.pathExists ?? (() => true);
     const tasks = (tasksByProject[project.id] ?? [])
       .filter((t) => t.useWorktree && isInsideDir(legacyDir, t.path))
       .map((t) => ({
@@ -43,7 +48,8 @@ export function buildMigrationPlan(
         archived: t.archivedAt !== null,
         fromPath: path.resolve(t.path),
         toPath: path.join(targetDir, path.basename(path.resolve(t.path))),
-      }));
+      }))
+      .filter((t) => exists(t.fromPath) || exists(t.toPath));
     if (tasks.length === 0) continue;
     plan.push({
       projectId: project.id,

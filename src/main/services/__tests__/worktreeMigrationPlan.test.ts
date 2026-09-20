@@ -122,3 +122,32 @@ describe('isWorktreeLockedError', () => {
     expect(isWorktreeLockedError('fatal: destination already exists')).toBe(false);
   });
 });
+
+describe('buildMigrationPlan — missing worktree directories', () => {
+  it('leaves out a task whose worktree exists at neither location', () => {
+    const tasks = [
+      task({ id: 'gone', path: '/code/worktrees/gone-111' }),
+      task({ id: 'there', path: '/code/worktrees/there-222' }),
+      task({ id: 'moved', path: '/code/worktrees/moved-333' }),
+    ];
+    const plan = buildMigrationPlan(
+      [project()],
+      { p1: tasks },
+      {
+        ...helpers,
+        pathExists: (p) =>
+          p === '/code/worktrees/there-222' || p === '/code/app/.claude/worktrees/moved-333',
+      },
+    );
+    expect(plan[0]!.tasks.map((t) => t.taskId)).toEqual(['there', 'moved']);
+  });
+
+  it('drops the project when every task is gone', () => {
+    const plan = buildMigrationPlan(
+      [project()],
+      { p1: [task({ id: 'gone', path: '/code/worktrees/gone-111' })] },
+      { ...helpers, pathExists: () => false },
+    );
+    expect(plan).toEqual([]);
+  });
+});
