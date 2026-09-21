@@ -19,6 +19,10 @@ import { openInIde } from '../../lib/openInIde';
 import { useSettings } from '../../stores/settingsStore';
 import { useRuntime } from '../../stores/runtimeStore';
 import { useProjects } from '../../stores/projectsStore';
+import { useGit } from '../../stores/gitStore';
+
+/** How often the sidebar re-checks visible tasks for PRs. */
+const SIDEBAR_PR_REFRESH_MS = 5 * 60_000;
 
 interface ProjectsSectionProps {
   projects: Project[];
@@ -76,6 +80,8 @@ export function ProjectsSection({
   const justCreatedProjectId = useProjects((s) => s.justCreatedProjectId);
   const clearJustCreatedProject = useProjects((s) => s.clearJustCreatedProject);
   const newRowRef = useRef<HTMLDivElement | null>(null);
+  const prByTask = useGit((s) => s.prByTask);
+  const detectProjectPrs = useGit((s) => s.detectProjectPrs);
 
   // One-shot: scroll the freshly-created project's row into view, then clear the
   // signal so we never scroll again on unrelated re-renders.
@@ -101,6 +107,36 @@ export function ProjectsSection({
   useEffect(() => {
     localStorage.setItem('expandedProjects', JSON.stringify([...expandedProjects]));
   }, [expandedProjects]);
+
+  // Look up each visible task's PR so the row can link to it. Keyed on a
+  // branch signature of the expanded projects (not the arrays) so routine
+  // store updates don't re-spam gh/ado; refreshed on a slow interval so a PR
+  // opened later still shows up. The active task's own poll (gitStore.detectPr)
+  // keeps its entry fresher.
+  const prSig = projects
+    .filter((p) => expandedProjects.has(p.id))
+    .map(
+      (p) =>
+        `${p.id}=` +
+        (tasksByProject[p.id] || [])
+          .filter((t) => !t.archivedAt)
+          .map((t) => `${t.id}:${t.branch}`)
+          .join(','),
+    )
+    .join('|');
+  useEffect(() => {
+    const run = () => {
+      for (const project of projects) {
+        if (!expandedProjects.has(project.id)) continue;
+        const tasks = (tasksByProject[project.id] || []).filter((t) => !t.archivedAt);
+        if (tasks.length > 0) void detectProjectPrs(project, tasks);
+      }
+    };
+    run();
+    const interval = setInterval(run, SIDEBAR_PR_REFRESH_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prSig, detectProjectPrs]);
   const [collapsedArchived, setCollapsedArchived] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragIdRef = useRef<string | null>(null);
@@ -348,6 +384,7 @@ export function ProjectsSection({
                           isActive={task.id === activeTaskId}
                           activityInfo={taskActivity[task.id]}
                           ctx={contextUsage[task.id]}
+                          prInfo={prByTask[task.id] ?? null}
                           isUnseen={!!unseenTaskIds?.has(task.id)}
                           hasRemoteControl={!!remoteControlStates[task.id]}
                           isDragging={draggingTaskId === task.id}

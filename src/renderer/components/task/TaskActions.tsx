@@ -2,7 +2,7 @@ import { Code2, Power, Settings, Archive, Trash2 } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 
 interface TaskActionsProps {
-  /** Show the Close (power) button only when the task has a live session. */
+  /** Show the "Put to sleep" (power) button only when the task has a live session. */
   hasActiveSession: boolean;
   onOpenIde: () => void;
   onClose: () => void;
@@ -43,7 +43,7 @@ export function TaskActions({
             e.stopPropagation();
             onClose();
           }}
-          title="Close task"
+          title="Put to sleep"
           size="sm"
         >
           <Power size={12} strokeWidth={1.8} />

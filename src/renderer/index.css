@@ -81,6 +81,8 @@
     --git-deleted: 0 84% 60%;
     --git-renamed: 217 91% 60%;
     --pr-merged: 262 60% 55%; /* GitHub merged-PR purple */
+    --badge-main: 218 34% 36%; /* deep moonlight: "main checkout" task badge */
+    --badge-main-foreground: 0 0% 100%;
     --git-untracked: 0 0% 50%;
     --git-conflicted: 25 95% 53%;
 
@@ -157,6 +159,8 @@
     --git-deleted: 0 72% 56%; /* bright red */
     --git-renamed: 217 91% 60%; /* bright blue */
     --pr-merged: 262 70% 72%; /* GitHub merged-PR purple, lightened for dark bg */
+    --badge-main: 218 34% 36%; /* deep moonlight: "main checkout" task badge */
+    --badge-main-foreground: 0 0% 100%;
     --git-untracked: 0 0% 56%;
     --git-conflicted: 25 95% 53%; /* bright orange */
 
@@ -219,6 +223,8 @@
     --git-deleted: 0 84% 60%;
     --git-renamed: 217 91% 60%;
     --pr-merged: 262 60% 55%;
+    --badge-main: 218 34% 36%; /* deep moonlight: "main checkout" task badge */
+    --badge-main-foreground: 0 0% 100%;
     --git-untracked: 0 0% 50%;
     --git-conflicted: 25 95% 53%;
 
@@ -279,6 +285,8 @@
     --git-deleted: 0 72% 56%;
     --git-renamed: 217 91% 60%;
     --pr-merged: 262 70% 72%;
+    --badge-main: 218 34% 36%; /* deep moonlight: "main checkout" task badge */
+    --badge-main-foreground: 0 0% 100%;
     --git-untracked: 0 0% 56%;
     --git-conflicted: 25 95% 53%;
 

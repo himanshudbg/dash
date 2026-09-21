@@ -202,7 +202,12 @@ export const useGit = create<GitStore>((set, get) => ({
           const resp = await window.electronAPI.githubGetPrForBranch(cwd, branch);
           if (!cancelled && resp.success) pr = resp.data ?? null;
         }
-        if (!cancelled) set({ prInfo: pr });
+        if (!cancelled) {
+          set({
+            prInfo: pr,
+            ...(task ? { prByTask: { ...get().prByTask, [task.id]: pr } } : {}),
+          });
+        }
       } catch {
         if (!cancelled) set({ prInfo: null });
       }

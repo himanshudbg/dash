@@ -22,6 +22,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { TaskActions } from '../task/TaskActions';
 import { TokenBadge } from '../ui/TokenBadge';
 import { PrBadge } from '../ui/PrBadge';
+import { MainRepoBadge } from '../ui/MainRepoBadge';
 
 interface ProjectOverviewProps {
   project: Project;
@@ -298,6 +299,11 @@ export function ProjectOverview({
                       <span className="text-[13px] font-medium text-foreground flex-1 min-w-0 wrap-break-word">
                         {task.name}
                       </span>
+                      {!task.useWorktree && (
+                        <span className="mt-[3px] shrink-0">
+                          <MainRepoBadge branch={task.branch} />
+                        </span>
+                      )}
                     </div>
 
                     {/* Details */}

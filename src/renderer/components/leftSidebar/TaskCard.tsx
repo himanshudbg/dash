@@ -1,8 +1,10 @@
 import { GitBranch, Globe } from 'lucide-react';
-import type { Task, ActivityInfo, ContextUsage } from '../../../shared/types';
+import type { Task, ActivityInfo, ContextUsage, PullRequestInfo } from '../../../shared/types';
 import { TaskActions } from '../task/TaskActions';
 import { Tooltip } from '../ui/Tooltip';
 import { UsageBarInline } from '../ui/UsageBar';
+import { MainRepoBadge } from '../ui/MainRepoBadge';
+import { PrBadge } from '../ui/PrBadge';
 import type { DragHandlers } from '../../hooks/useDragReorder';
 
 interface TaskCardProps {
@@ -10,6 +12,8 @@ interface TaskCardProps {
   isActive: boolean;
   activityInfo?: ActivityInfo;
   ctx?: ContextUsage;
+  /** PR on the task's branch, if one exists on the remote. */
+  prInfo?: PullRequestInfo | null;
   isUnseen: boolean;
   hasRemoteControl: boolean;
   isDragging: boolean;
@@ -28,6 +32,7 @@ export function TaskCard({
   isActive,
   activityInfo,
   ctx,
+  prInfo,
   isUnseen,
   hasRemoteControl,
   isDragging,
@@ -114,6 +119,12 @@ export function TaskCard({
         >
           {task.name}
         </span>
+
+        {/* Runs in the project's own checkout, not a worktree */}
+        {!task.useWorktree && <MainRepoBadge branch={task.branch} />}
+
+        {/* PR on this branch — icon-only link to the remote */}
+        {prInfo && <PrBadge prInfo={prInfo} variant="icon" />}
 
         {/* Context percentage (visible when data available, hidden on hover to show actions) */}
         {ctx && ctx.percentage > 0 && (
