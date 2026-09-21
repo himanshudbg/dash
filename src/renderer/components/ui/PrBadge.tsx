@@ -13,15 +13,16 @@ interface PrBadgeProps {
 
 /**
  * PR link, color-coded by state (standard GitHub colors): open → green,
- * merged → purple. Closed PRs render nothing. Shared by the task header (md
- * pill), the ProjectView task cards (sm pill) and the sidebar rows (icon).
- * Opens the PR on the remote.
+ * merged → purple, closed → red. The pill variants hide closed PRs; the icon
+ * variant always renders. Shared by the task header (md pill), the ProjectView
+ * task cards (sm pill) and the sidebar rows (icon). Opens the PR on the remote.
  */
 export function PrBadge({ prInfo, size = 'md', variant = 'pill' }: PrBadgeProps) {
-  if (prInfo.state === 'closed') return null;
   const colorCls = prStatusPill(prInfo.state);
   const Icon = prInfo.state === 'merged' ? GitMerge : GitPullRequest;
 
+  // The sidebar icon always shows — a closed PR (red) is still the link the
+  // user wants — while the larger pills keep hiding closed ones.
   if (variant === 'icon') {
     return (
       <Tooltip content={`PR #${prInfo.number}: ${prInfo.title} (${prInfo.state})`}>
@@ -39,6 +40,7 @@ export function PrBadge({ prInfo, size = 'md', variant = 'pill' }: PrBadgeProps)
     );
   }
 
+  if (prInfo.state === 'closed') return null;
   const iconSize = size === 'sm' ? 10 : 11;
   const sizeCls = size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-[3px] text-[11px]';
   return (

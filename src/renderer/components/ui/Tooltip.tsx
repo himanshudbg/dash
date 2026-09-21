@@ -67,10 +67,25 @@ export function Tooltip({ content, side = 'top', delay = 150, children }: Toolti
     };
   }, []);
 
+  // The child may carry a ref of its own (a Radix trigger's, a forwardRef
+  // parent's) — in React 19 it is a plain prop. cloneElement would replace it
+  // with ours, silently detaching whatever attached it, so hand the node to both.
+  const childRef = children.props.ref;
+  const mergedRef = useCallback(
+    (node: HTMLElement | null) => {
+      triggerRef.current = node;
+      if (typeof childRef === 'function') childRef(node);
+      else if (childRef && typeof childRef === 'object') {
+        (childRef as React.MutableRefObject<HTMLElement | null>).current = node;
+      }
+    },
+    [childRef],
+  );
+
   return (
     <>
       {React.cloneElement(children, {
-        ref: triggerRef,
+        ref: mergedRef,
         onMouseEnter: show,
         onMouseLeave: hide,
         onMouseDown: hide,

@@ -3,8 +3,9 @@ import { Tooltip } from './Tooltip';
 
 type IconButtonSize = 'sm' | 'md';
 
-interface IconButtonProps {
-  onClick: (e: React.MouseEvent) => void;
+interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'title'> {
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Tooltip text (not a native title, which would double up). */
   title: string;
   variant?: 'default' | 'destructive';
   size?: IconButtonSize;
@@ -22,22 +23,27 @@ const sizeStyles = {
   md: 'p-1.5',
 } as const;
 
-export function IconButton({
-  onClick,
-  title,
-  variant = 'default',
-  size = 'md',
-  className = '',
-  children,
-}: IconButtonProps) {
+/**
+ * Tooltip-wrapped icon button. Forwards its ref and spreads any extra button
+ * props so it can be the `asChild` target of a Radix trigger (dropdown menu,
+ * popover): Radix attaches its pointer handlers, aria and data attributes to
+ * the child, and a component that swallowed them would render a dead button.
+ */
+export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { onClick, title, variant = 'default', size = 'md', className = '', children, ...rest },
+  ref,
+) {
   return (
     <Tooltip content={title}>
       <button
+        ref={ref}
+        type="button"
         onClick={onClick}
         className={`rounded-md transition-colors duration-150 ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
+        {...rest}
       >
         {children}
       </button>
     </Tooltip>
   );
-}
+});
