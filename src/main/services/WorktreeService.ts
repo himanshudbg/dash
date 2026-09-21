@@ -29,6 +29,13 @@ function scriptStringToCommand(script: string | null | undefined): string | null
   return commands.length > 0 ? commands.join(' && ') : null;
 }
 
+/** Setup scripts do cold installs (`pnpm install`, `pip install`, …) that can
+ *  take minutes on a fresh worktree. Anything still running after this is
+ *  killed, so scripts must not stay in the foreground (start servers
+ *  detached or via a service instead). Teardown should be quick. */
+const SETUP_SCRIPT_TIMEOUT_MS = 10 * 60_000;
+const TEARDOWN_SCRIPT_TIMEOUT_MS = 30_000;
+
 const PRESERVE_PATTERNS = [
   '.env',
   '.env.keys',
@@ -349,7 +356,7 @@ export class WorktreeService {
 
       await execAsync(command, {
         cwd,
-        timeout: 30_000,
+        timeout: TEARDOWN_SCRIPT_TIMEOUT_MS,
         env: { ...process.env, ...env },
       });
     } catch (error: unknown) {
@@ -404,15 +411,21 @@ export class WorktreeService {
 
         await execAsync(command, {
           cwd,
-          timeout: 60_000,
+          timeout: SETUP_SCRIPT_TIMEOUT_MS,
           env: { ...process.env, ...env },
         });
       } catch (error: unknown) {
+        const killed =
+          error && typeof error === 'object' && 'killed' in error
+            ? (error as { killed: unknown }).killed === true
+            : false;
         const stderr =
           error && typeof error === 'object' && 'stderr' in error
             ? String((error as { stderr: unknown }).stderr).trim()
             : '';
-        const msg = stderr || (error instanceof Error ? error.message : String(error));
+        const msg = killed
+          ? `timed out after ${SETUP_SCRIPT_TIMEOUT_MS / 60_000} min (scripts must not stay in the foreground)`
+          : stderr || (error instanceof Error ? error.message : String(error));
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) {
             win.webContents.send('app:toast', {
