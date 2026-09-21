@@ -15,6 +15,15 @@ import { ensureWatching, stop, stopAll, events } from '../PortsConfigWatcher';
 // actual file events.
 const DEBOUNCE_MARGIN_MS = 3500;
 
+/**
+ * Give a freshly armed fs.watch a beat before writing. Under full-suite load
+ * macOS FSEvents can miss a write that lands in the same tick as the watch
+ * registration, which reads as "no event" and fails the test.
+ */
+function settleWatch(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 250));
+}
+
 function waitForConfigEvent(taskId: string, timeoutMs = DEBOUNCE_MARGIN_MS): Promise<boolean> {
   return new Promise((resolve) => {
     const handler = (payload: { taskId: string }) => {
@@ -69,10 +78,7 @@ describe('PortsConfigWatcher lifecycle', () => {
     fs.mkdirSync(dashDir);
     ensureWatching('tA', worktree); // retries the arm
 
-    // Give the freshly-armed fs.watch a beat to attach before the write —
-    // under full-suite load macOS FSEvents can miss a write that lands in
-    // the same tick as the watch registration.
-    await new Promise((r) => setTimeout(r, 250));
+    await settleWatch();
     const wait = waitForConfigEvent('tA', 7000);
     fs.writeFileSync(path.join(dashDir, 'ports.json'), '{"ports":[]}');
     expect(await wait).toBe(true);
@@ -84,6 +90,7 @@ describe('PortsConfigWatcher lifecycle', () => {
     ensureWatching('tB', worktree);
     ensureWatching('tB', worktree);
     ensureWatching('tB', worktree);
+    await settleWatch();
 
     let count = 0;
     const handler = (payload: { taskId: string }) => {
@@ -107,7 +114,7 @@ describe('PortsConfigWatcher lifecycle', () => {
     const dashDir = path.join(worktree, '.dash');
     fs.mkdirSync(dashDir);
     ensureWatching('tD', worktree);
-    await new Promise((r) => setTimeout(r, 250));
+    await settleWatch();
 
     // The valid-config event must NOT also fire for the same (invalid) write.
     // Both emit synchronously in notifyConfigChanged, so a flag is sufficient.

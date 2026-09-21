@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // execFile is promisified inside the service; mock it at the callback level so
 // `promisify` wraps our fake. Each test queues responses per invocation.
@@ -12,7 +12,8 @@ vi.mock('child_process', async () => {
   // rejects with the error carrying stdout/stderr.
   const execFile = (_file: string, args: string[], opts: Record<string, unknown>) => {
     calls.push({ args, opts });
-    const r = responses.shift() ?? { stdout: '' };
+    // An unqueued listing reads as "no sessions", not as unparseable output.
+    const r = responses.shift() ?? { stdout: args[0] === 'agents' ? '[]' : '' };
     if (r.error) {
       const e = r.error as Error & { stdout?: string; stderr?: string };
       e.stdout = r.stdout ?? '';
@@ -41,6 +42,14 @@ const listing = (rows: unknown[]) => ({ stdout: JSON.stringify(rows) });
 beforeEach(() => {
   calls.length = 0;
   responses = [];
+});
+
+// dispatch() and the lifecycle verbs fire a background refresh() and don't
+// wait for it. Join it here so it can't run on into the next test and shift a
+// response off that test's queue. refresh() coalesces, so this returns the
+// in-flight promise when there is one rather than starting another listing.
+afterEach(async () => {
+  await supervisorService.refresh('test-drain');
 });
 
 describe('SupervisorService.dispatch', () => {

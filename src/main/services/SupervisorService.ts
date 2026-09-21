@@ -258,7 +258,11 @@ class SupervisorServiceImpl extends EventEmitter {
 
   /** The jobs dir is a trigger only; its files are never read. */
   private armWatcher(): void {
-    if (this.watcher) return;
+    // Only while polling: stopPolling() closes the watcher, and a refresh fired
+    // by a lifecycle verb afterwards (say, during quit) must not re-arm it. It
+    // also keeps unit tests, which never start polling, from putting a live
+    // fs.watch on the developer's real ~/.claude/jobs.
+    if (!this.running || this.watcher) return;
     const dir = jobsDir();
     if (!fs.existsSync(dir)) return; // retried on every poll
     try {
