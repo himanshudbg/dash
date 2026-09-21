@@ -1082,3 +1082,28 @@ export interface GetSkillDetailArgs {
   scope: ExtensionScopeRef;
   skillName: string;
 }
+
+// ── Auto-update ─────────────────────────────────────────────
+
+export type AutoUpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready';
+
+/**
+ * The updater's entire observable state. Broadcast whole on `autoUpdate:status`
+ * so the renderer never has to stitch it together from separate events.
+ */
+export interface AutoUpdateStatus {
+  state: AutoUpdateState;
+  availableVersion: string | null;
+  /** Release notes from the update manifest, when the feed carries them. */
+  releaseNotes: string | null;
+  /** 0–100 while downloading, else null. */
+  percent: number | null;
+  /** Epoch ms when a check last finished — found, not found or failed. */
+  lastCheckAt: number | null;
+  /** Epoch ms when the in-flight check started; null when not checking. */
+  checkStartedAt: number | null;
+  /** Last failure text, kept so Settings can explain an otherwise silent failure. */
+  lastError: string | null;
+  /** False when the updater isn't wired up: dev builds and Windows. */
+  initialized: boolean;
+}

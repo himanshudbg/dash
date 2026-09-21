@@ -7,6 +7,7 @@ import { ProjectsSection } from './ProjectsSection';
 import { useSettings } from '../../stores/settingsStore';
 import { useRuntime } from '../../stores/runtimeStore';
 import { getProjectActivity } from './projectActivity';
+import { UpdateBanner } from './UpdateBanner';
 
 interface LeftSidebarProps {
   projects: Project[];
@@ -304,6 +305,9 @@ export function LeftSidebar({
         onReorderTasks={onReorderTasks}
         onReorderTasksCommit={onReorderTasksCommit}
       />
+
+      {/* Update banner — persistent, above the footer actions */}
+      <UpdateBanner />
 
       {/* Skills & Settings */}
       <div className="glass-hairline-t px-2 pt-4 pb-4 space-y-0.5">

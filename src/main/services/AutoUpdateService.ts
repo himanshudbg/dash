@@ -1,39 +1,79 @@
 import { autoUpdater, type UpdateInfo, type ProgressInfo } from 'electron-updater';
-import { app, dialog } from 'electron';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { app, powerMonitor } from 'electron';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { BrowserWindow } from 'electron';
-import type { IpcResponse } from '@shared/types';
+import type { AutoUpdateStatus, IpcResponse } from '@shared/types';
+import { initialStatus, reduce, shouldCheck, type UpdateEvent } from './autoUpdateState';
 
-type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready';
-
-export interface AutoUpdateStatus {
-  state: UpdateState;
-  availableVersion: string | null;
-  /** False when the service hasn't been wired up (dev, Windows, or unsupported platforms). */
-  initialized: boolean;
-}
+/**
+ * Wires electron-updater to Dash. Updates download on their own and install on
+ * quit; the renderer gets the whole status on one channel and shows a
+ * persistent banner, replacing the stack of never-dismissing toasts that made
+ * the old flow unusable (#173).
+ */
 
 let mainWindow: BrowserWindow | null = null;
 let checkInterval: ReturnType<typeof setInterval> | null = null;
 let initialCheckTimer: ReturnType<typeof setTimeout> | null = null;
-let lastCheckTime = 0;
-let state: UpdateState = 'idle';
-let availableVersion: string | null = null;
-let initialized = false;
+let status: AutoUpdateStatus = initialStatus(false);
+let listening = false;
 
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const INITIAL_DELAY_MS = 10 * 1000; // 10 seconds
-const CHECK_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const LOG_MAX_BYTES = 512 * 1024;
 
 function getPreferencePath(): string {
   return join(app.getPath('userData'), 'update-preferences.json');
 }
 
-function send(channel: string, ...args: unknown[]): void {
+function getLogPath(): string {
+  return join(app.getPath('userData'), 'logs', 'updater.log');
+}
+
+/** Append one line to <userData>/logs/updater.log, trimming it when it grows. */
+function writeLog(level: string, message: string): void {
+  try {
+    const path = getLogPath();
+    mkdirSync(join(app.getPath('userData'), 'logs'), { recursive: true });
+    if (existsSync(path) && statSync(path).size > LOG_MAX_BYTES) {
+      // Keep the tail: a support case cares about what happened most recently.
+      const kept = readFileSync(path, 'utf-8').slice(-LOG_MAX_BYTES / 2);
+      writeFileSync(path, kept, 'utf-8');
+    }
+    appendFileSync(path, `${new Date().toISOString()} [${level}] ${message}\n`, 'utf-8');
+  } catch {
+    // Logging must never take the updater down.
+  }
+}
+
+const fileLogger = {
+  info: (m: unknown) => writeLog('info', String(m)),
+  warn: (m: unknown) => writeLog('warn', String(m)),
+  error: (m: unknown) => writeLog('error', String(m)),
+  debug: (_m: unknown) => {
+    // Dropped: electron-updater's debug stream is far too chatty for a log
+    // the user may be asked to send us.
+  },
+};
+
+/** Fold an updater event into the status and push the result to the renderer. */
+function apply(event: UpdateEvent): void {
+  status = reduce(status, event, Date.now());
+  publish();
+}
+
+function publish(): void {
   try {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(channel, ...args);
+      mainWindow.webContents.send('autoUpdate:status', status);
     }
   } catch {
     // Best effort
@@ -51,17 +91,40 @@ function clearTimers(): void {
   }
 }
 
+const onWake = (): void => {
+  void AutoUpdateService.checkForUpdates({ source: 'background' });
+};
+
 function startTimers(): void {
   clearTimers();
   initialCheckTimer = setTimeout(() => {
     initialCheckTimer = null;
-    // Route through the service so state/lastCheckTime stay coherent and
-    // download/ready states aren't disturbed by a background check.
-    AutoUpdateService.checkForUpdates({ source: 'background' }).catch(() => {});
+    onWake();
   }, INITIAL_DELAY_MS);
-  checkInterval = setInterval(() => {
-    AutoUpdateService.checkForUpdates({ source: 'background' }).catch(() => {});
-  }, CHECK_INTERVAL_MS);
+  checkInterval = setInterval(onWake, CHECK_INTERVAL_MS);
+
+  // A laptop that was shut for a week should notice on the way back, not four
+  // hours later. Both are cheap: shouldCheck() holds them to the cooldown.
+  if (!listening) {
+    listening = true;
+    app.on('browser-window-focus', onWake);
+    try {
+      powerMonitor.on('resume', onWake);
+    } catch {
+      // powerMonitor is unavailable before app ready / under tests.
+    }
+  }
+}
+
+function stopListening(): void {
+  if (!listening) return;
+  listening = false;
+  app.removeListener('browser-window-focus', onWake);
+  try {
+    powerMonitor.removeListener('resume', onWake);
+  } catch {
+    // see startTimers()
+  }
 }
 
 export class AutoUpdateService {
@@ -93,84 +156,69 @@ export class AutoUpdateService {
     clearTimers();
 
     mainWindow = window;
-    state = 'idle';
-    availableVersion = null;
-    initialized = true;
+    status = initialStatus(true);
 
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
+    // Download without being asked, and apply on quit. Under 0.16.0 a restart
+    // costs nothing: task sessions live under Claude Code's supervisor and
+    // re-attach afterwards, so there is no work to lose.
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.logger = fileLogger;
 
     autoUpdater.on('update-available', (info: UpdateInfo) => {
-      state = 'available';
-      availableVersion = info.version;
-      send('autoUpdate:available', { version: info.version });
+      writeLog('info', `update available: ${info.version}`);
+      apply({
+        type: 'available',
+        version: info.version,
+        releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+      });
     });
 
     autoUpdater.on('update-not-available', () => {
-      // Only reset if we were the ones who triggered the check. A periodic
-      // background check that races against an in-progress download/ready
-      // state must not wipe that state.
-      if (state === 'checking') {
-        state = 'idle';
-        availableVersion = null;
-        send('autoUpdate:notAvailable');
-      }
+      apply({ type: 'not-available' });
     });
 
     autoUpdater.on('download-progress', (progress: ProgressInfo) => {
-      send('autoUpdate:downloadProgress', {
-        percent: progress.percent,
-        bytesPerSecond: progress.bytesPerSecond,
-        transferred: progress.transferred,
-        total: progress.total,
-      });
+      apply({ type: 'progress', percent: progress.percent });
     });
 
     autoUpdater.on('update-downloaded', () => {
-      state = 'ready';
-      send('autoUpdate:downloaded');
+      writeLog('info', `update downloaded: ${status.availableVersion ?? 'unknown'}`);
+      apply({ type: 'downloaded' });
     });
 
     autoUpdater.on('error', (err: Error) => {
-      const prevState = state;
-      if (state === 'checking') state = 'idle';
-      else if (state === 'downloading') state = 'available';
-      console.error(`[AutoUpdate] Error during ${prevState}:`, err?.message || err);
-      send('autoUpdate:error', {
-        message: prevState === 'downloading' ? 'Download failed' : 'Update check failed',
-        detail: err?.message || String(err),
-      });
+      const detail = err?.message || String(err);
+      writeLog('error', `during ${status.state}: ${detail}`);
+      apply({ type: 'error', message: detail });
     });
 
-    if (AutoUpdateService.readPreference()) {
-      startTimers();
-    }
+    if (AutoUpdateService.readPreference()) startTimers();
+    publish();
   }
 
   static setWindow(window: BrowserWindow): void {
     mainWindow = window;
+    // A reloaded renderer starts blank; hand it the current status at once so
+    // a downloaded update doesn't go quiet until the next check.
+    publish();
   }
 
   static getStatus(): IpcResponse<AutoUpdateStatus> {
-    return {
-      success: true,
-      data: { state, availableVersion, initialized },
-    };
+    return { success: true, data: status };
   }
 
   static setEnabled(enabled: boolean): IpcResponse<void> {
     AutoUpdateService.writePreference(enabled);
-    if (!initialized) {
-      // Persist the preference but don't fail — the next packaged launch
-      // will pick it up when initialize() runs.
+    if (!status.initialized) {
+      // Persist it anyway — the next packaged launch picks it up.
       return { success: true };
     }
     if (enabled) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        startTimers();
-      }
+      if (mainWindow && !mainWindow.isDestroyed()) startTimers();
     } else {
       clearTimers();
+      stopListening();
     }
     return { success: true };
   }
@@ -178,81 +226,70 @@ export class AutoUpdateService {
   static async checkForUpdates(
     opts: { source?: 'user' | 'background' } = {},
   ): Promise<IpcResponse<void>> {
-    if (!initialized) {
+    if (!status.initialized) {
       return { success: false, error: 'Auto-update not available in this build' };
     }
     const source = opts.source ?? 'user';
-    const now = Date.now();
-    // Cooldown applies to background checks only. A user-initiated check
-    // should always run — otherwise the UI sits at "Checking…" forever.
-    if (source === 'background' && now - lastCheckTime < CHECK_COOLDOWN_MS) {
+    if (!shouldCheck(status, source, Date.now())) {
+      // Not an error: there is already an update in hand, or we checked a
+      // moment ago. The renderer re-reads the status either way.
       return { success: true };
     }
-    if (state === 'downloading' || state === 'ready') {
-      // We already have an update in flight; treat as a no-op success so
-      // the renderer can clear any optimistic "checking" UI immediately.
-      return { success: true };
-    }
+    apply({ type: 'check-started' });
     try {
-      lastCheckTime = now;
-      state = 'checking';
       await autoUpdater.checkForUpdates();
       return { success: true };
     } catch (err) {
-      state = 'idle';
+      // `error` usually fires too, but not for every rejection.
+      apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
       return { success: false, error: String(err) };
     }
   }
 
+  /** Manual retry after a failed auto-download. */
   static async downloadUpdate(): Promise<IpcResponse<void>> {
-    if (!initialized) {
+    if (!status.initialized) {
       return { success: false, error: 'Auto-update not available in this build' };
     }
-    if (state !== 'available') {
+    if (status.state !== 'available') {
       return { success: false, error: 'No update available to download' };
     }
     try {
-      state = 'downloading';
+      apply({ type: 'progress', percent: 0 });
       await autoUpdater.downloadUpdate();
       return { success: true };
     } catch (err) {
-      state = 'available';
-      return { success: false, error: String(err) };
+      const detail = err instanceof Error ? err.message : String(err);
+      apply({ type: 'error', message: detail });
+      return { success: false, error: detail };
     }
   }
 
   static async quitAndInstall(): Promise<IpcResponse<void>> {
-    if (!initialized) {
+    if (!status.initialized) {
       return { success: false, error: 'Auto-update not available in this build' };
     }
-    if (state !== 'ready') {
+    if (status.state !== 'ready') {
       return { success: false, error: 'No update ready to install' };
     }
     try {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        const { response } = await dialog.showMessageBox(mainWindow, {
-          type: 'info',
-          buttons: ['Restart Now', 'Cancel'],
-          defaultId: 0,
-          cancelId: 1,
-          title: 'Update Ready',
-          message: 'A new version has been downloaded. Restart now to apply the update?',
-        });
-        if (response !== 0) {
-          return { success: false, error: 'User cancelled' };
-        }
-      }
+      // No confirmation dialog: the user clicked "Restart to update", which is
+      // the confirmation. The old extra prompt was pure friction.
+      writeLog('info', `installing ${status.availableVersion ?? 'update'} and restarting`);
       autoUpdater.quitAndInstall();
       return { success: true };
     } catch (err) {
-      return { success: false, error: String(err) };
+      const detail = err instanceof Error ? err.message : String(err);
+      apply({ type: 'error', message: detail });
+      return { success: false, error: detail };
     }
   }
 
   static cleanup(): void {
     clearTimers();
+    stopListening();
     autoUpdater.removeAllListeners();
     mainWindow = null;
-    initialized = false;
+    status = initialStatus(false);
   }
 }

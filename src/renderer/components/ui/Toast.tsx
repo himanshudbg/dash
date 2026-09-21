@@ -1,19 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
 import { useWizardToasts } from '../ports/useWizardToasts';
 import { useReleaseNotesToast } from './useReleaseNotesToast';
 
-interface ToastContainerProps {
-  updateNotificationsEnabled: boolean;
-}
-
-export function ToastContainer({ updateNotificationsEnabled }: ToastContainerProps) {
+export function ToastContainer() {
   useWizardToasts();
   useReleaseNotesToast();
-  const updateNotificationsRef = useRef(updateNotificationsEnabled);
-  useEffect(() => {
-    updateNotificationsRef.current = updateNotificationsEnabled;
-  }, [updateNotificationsEnabled]);
 
   useEffect(() => {
     return window.electronAPI.onToast((data) => {
@@ -30,54 +22,6 @@ export function ToastContainer({ updateNotificationsEnabled }: ToastContainerPro
       } else {
         toast(data.message, { duration: 6000 });
       }
-    });
-  }, []);
-
-  // Auto-update: update available
-  useEffect(() => {
-    return window.electronAPI.onAutoUpdateAvailable((info) => {
-      if (!updateNotificationsRef.current) return;
-      toast(`Update v${info.version} available`, {
-        duration: Infinity,
-        action: {
-          label: 'Download',
-          onClick: () => {
-            void window.electronAPI.autoUpdateDownload();
-          },
-        },
-      });
-    });
-  }, []);
-
-  // Auto-update: download complete
-  useEffect(() => {
-    return window.electronAPI.onAutoUpdateDownloaded(() => {
-      if (!updateNotificationsRef.current) return;
-      toast('Update ready to install', {
-        duration: Infinity,
-        action: {
-          label: 'Restart',
-          onClick: () => {
-            void window.electronAPI.autoUpdateQuitAndInstall();
-          },
-        },
-      });
-    });
-  }, []);
-
-  // Auto-update: error
-  useEffect(() => {
-    return window.electronAPI.onAutoUpdateError((info) => {
-      if (!updateNotificationsRef.current) return;
-      toast.error(`${info.message}. ${info.detail}`, {
-        duration: 10000,
-        action: {
-          label: 'Download manually',
-          onClick: () => {
-            void window.electronAPI.openExternal('https://github.com/syv-ai/dash/releases/latest');
-          },
-        },
-      });
     });
   }, []);
 

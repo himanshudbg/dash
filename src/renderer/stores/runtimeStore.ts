@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import type {
   ActivityInfo,
+  AutoUpdateStatus,
   ClaudeCliInfo,
   RemoteControlState,
   RtkStatus,
@@ -35,6 +36,9 @@ export interface RuntimeState {
    *  refreshed by main's reconcile loop. Task-owned rows are matched by
    *  `Task.jobId`; the rest are "foreign" and listed per project. */
   supervisorSessions: SupervisorSession[];
+  /** The updater's whole state, or null before main has answered. Drives the
+   *  sidebar banner and the Settings → Updates card. */
+  updateStatus: AutoUpdateStatus | null;
 }
 
 export interface RuntimeActions {
@@ -49,6 +53,10 @@ export interface RuntimeActions {
   adoptSession: (projectId: string, jobId: string) => Promise<Task | null>;
   enableRtk: (enabled: boolean) => Promise<void>;
   downloadRtk: () => Promise<void>;
+  /** Ask main to look for an update now (bypasses the background cooldown). */
+  checkForUpdates: () => Promise<void>;
+  /** Restart into a downloaded update. */
+  installUpdate: () => Promise<void>;
   /** Wire every live IPC subscription; returns a combined cleanup. */
   init: () => () => void;
 }
@@ -64,6 +72,7 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
   rtkDownloadProgress: null,
   claudeCli: null,
   supervisorSessions: [],
+  updateStatus: null,
 
   refreshClaudeCli: async (opts) => {
     const resp = await window.electronAPI.detectClaude(opts);
@@ -94,6 +103,24 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
     }
     await useProjects.getState().loadTasks(projectId);
     return resp.data;
+  },
+
+  checkForUpdates: async () => {
+    const resp = await window.electronAPI.autoUpdateCheck();
+    if (!resp.success) {
+      toast.error(resp.error ?? 'Could not check for updates');
+      return;
+    }
+    // The check may have been a no-op (already downloading, or inside the
+    // cooldown) without emitting anything, so reconcile from the source of
+    // truth — otherwise the card can sit on "Checking…" forever.
+    const status = await window.electronAPI.autoUpdateGetStatus();
+    if (status.success && status.data) set({ updateStatus: status.data });
+  },
+
+  installUpdate: async () => {
+    const resp = await window.electronAPI.autoUpdateQuitAndInstall();
+    if (!resp.success) toast.error(resp.error ?? 'Could not install the update');
   },
 
   refreshTokenRollups: async () => {
@@ -281,6 +308,15 @@ export const useRuntime = create<RuntimeStore>((set, get) => ({
       cleanups.push(() => {
         cancelled = true;
         unsub();
+      });
+    }
+
+    // ── Auto-update ────────────────────────────────────────
+    {
+      const unsub = window.electronAPI.onAutoUpdateStatus((next) => set({ updateStatus: next }));
+      cleanups.push(unsub);
+      void window.electronAPI.autoUpdateGetStatus().then((resp) => {
+        if (resp.success && resp.data) set({ updateStatus: resp.data });
       });
     }
 

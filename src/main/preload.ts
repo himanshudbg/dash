@@ -521,49 +521,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   autoUpdateGetEnabled: () => ipcRenderer.invoke('autoUpdate:getEnabled'),
   autoUpdateSetEnabled: (enabled: boolean) => ipcRenderer.invoke('autoUpdate:setEnabled', enabled),
   autoUpdateGetStatus: () => ipcRenderer.invoke('autoUpdate:getStatus'),
-  onAutoUpdateAvailable: (callback: (info: { version: string }) => void) => {
-    const handler = (_event: unknown, info: { version: string }) => callback(info);
-    ipcRenderer.on('autoUpdate:available', handler);
+  onAutoUpdateStatus: (callback: (status: import('@shared/types').AutoUpdateStatus) => void) => {
+    const handler = (_event: unknown, status: import('@shared/types').AutoUpdateStatus) =>
+      callback(status);
+    ipcRenderer.on('autoUpdate:status', handler);
     return () => {
-      ipcRenderer.removeListener('autoUpdate:available', handler);
-    };
-  },
-  onAutoUpdateNotAvailable: (callback: () => void) => {
-    const handler = () => callback();
-    ipcRenderer.on('autoUpdate:notAvailable', handler);
-    return () => {
-      ipcRenderer.removeListener('autoUpdate:notAvailable', handler);
-    };
-  },
-  onAutoUpdateDownloadProgress: (
-    callback: (progress: {
-      percent: number;
-      bytesPerSecond: number;
-      transferred: number;
-      total: number;
-    }) => void,
-  ) => {
-    const handler = (
-      _event: unknown,
-      progress: { percent: number; bytesPerSecond: number; transferred: number; total: number },
-    ) => callback(progress);
-    ipcRenderer.on('autoUpdate:downloadProgress', handler);
-    return () => {
-      ipcRenderer.removeListener('autoUpdate:downloadProgress', handler);
-    };
-  },
-  onAutoUpdateDownloaded: (callback: () => void) => {
-    const handler = () => callback();
-    ipcRenderer.on('autoUpdate:downloaded', handler);
-    return () => {
-      ipcRenderer.removeListener('autoUpdate:downloaded', handler);
-    };
-  },
-  onAutoUpdateError: (callback: (info: { message: string; detail: string }) => void) => {
-    const handler = (_event: unknown, info: { message: string; detail: string }) => callback(info);
-    ipcRenderer.on('autoUpdate:error', handler);
-    return () => {
-      ipcRenderer.removeListener('autoUpdate:error', handler);
+      ipcRenderer.removeListener('autoUpdate:status', handler);
     };
   },
 

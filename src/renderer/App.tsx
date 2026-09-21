@@ -109,7 +109,6 @@ export function App() {
   const desktopNotification = useSettings((s) => s.desktopNotification);
   const autoUpdateEnabled = useSettings((s) => s.autoUpdateEnabled);
   const setAutoUpdateEnabled = useSettings((s) => s.setAutoUpdateEnabled);
-  const updateNotificationsEnabled = useSettings((s) => s.updateNotificationsEnabled);
   const shellDrawerCollapsed = useSettings((s) => s.shellDrawerCollapsed);
   const setShellDrawerCollapsed = useSettings((s) => s.setShellDrawerCollapsed);
   // Ports drawer defaults to collapsed so it doesn't intrude on projects
@@ -1556,7 +1555,7 @@ export function App() {
         </Suspense>
       )}
 
-      <ToastContainer updateNotificationsEnabled={updateNotificationsEnabled} />
+      <ToastContainer />
     </div>
   );
 }

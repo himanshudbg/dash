@@ -8,6 +8,7 @@ import {
   Moon,
   RotateCcw,
   Download,
+  RefreshCw,
   Pencil,
   Trash2,
   Plus,
@@ -54,6 +55,9 @@ import type {
   RtkTestResult,
 } from '../../../shared/types';
 import { UsageBar } from '../ui/UsageBar';
+import { Button } from '../ui/Button';
+import { ProgressBar } from '../ui/ProgressBar';
+import { updateHeadline, formatCheckedAt } from '../../utils/updateStatus';
 import { formatTokens, formatCost, formatResetTime } from '../../utils/format';
 import { useSettings } from '../../stores/settingsStore';
 import { useRuntime } from '../../stores/runtimeStore';
@@ -739,6 +743,9 @@ export function SettingsModal({
   latestRateLimits,
   onClose,
 }: SettingsModalProps) {
+  const updateStatus = useRuntime((s) => s.updateStatus);
+  const onCheckForUpdates = useRuntime((s) => s.checkForUpdates);
+  const onInstallUpdate = useRuntime((s) => s.installUpdate);
   const rtkStatus = useRuntime((s) => s.rtkStatus);
   const rtkDownloadProgress = useRuntime((s) => s.rtkDownloadProgress);
   const onRtkEnabledChange = useRuntime((s) => s.enableRtk);
@@ -782,40 +789,8 @@ export function SettingsModal({
   const [claudeInfo, setClaudeInfo] = useState<ClaudeCliInfo | null>(null);
   const [appVersion, setAppVersion] = useState('');
   const [claudeDefaultAttribution, setClaudeDefaultAttribution] = useState<string | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<
-    'idle' | 'checking' | 'available' | 'downloading' | 'ready'
-  >('idle');
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [telemetryEnabled, setTelemetryEnabled] = useState(true);
   const [telemetryEnvDisabled, setTelemetryEnvDisabled] = useState(false);
-
-  useEffect(() => {
-    // Events fire whether or not the modal is mounted, so on open we pull the
-    // current snapshot before subscribing — otherwise we'd show "idle" while
-    // the background check has already surfaced an available update.
-    void window.electronAPI.autoUpdateGetStatus?.().then((res) => {
-      if (res?.success && res.data) {
-        setUpdateStatus(res.data.state);
-        setUpdateVersion(res.data.availableVersion);
-      }
-    });
-    const cleanups = [
-      window.electronAPI.onAutoUpdateAvailable((info) => {
-        setUpdateStatus('available');
-        setUpdateVersion(info.version);
-      }),
-      window.electronAPI.onAutoUpdateNotAvailable(() => {
-        setUpdateStatus('idle');
-      }),
-      window.electronAPI.onAutoUpdateDownloaded(() => {
-        setUpdateStatus('ready');
-      }),
-      window.electronAPI.onAutoUpdateError(() => {
-        setUpdateStatus((s) => (s === 'downloading' ? 'available' : 'idle'));
-      }),
-    ];
-    return () => cleanups.forEach((fn) => fn());
-  }, []);
 
   useEffect(() => {
     void window.electronAPI.detectClaude().then((resp) => {
@@ -862,7 +837,7 @@ export function SettingsModal({
 
   const groups = groupByCategory(keybindings);
   const activeNav = NAV_ITEMS.find((n) => n.id === tab) ?? NAV_ITEMS[0]!;
-  const updateAvailable = updateStatus === 'available' || updateStatus === 'ready';
+  const updateAvailable = updateStatus?.state === 'available' || updateStatus?.state === 'ready';
 
   // Sliding sidebar highlight refs
   const navContainerRef = useRef<HTMLDivElement>(null);
@@ -1250,12 +1225,12 @@ export function SettingsModal({
                     <div className="flex items-center gap-3 px-4 py-3.5">
                       <div
                         className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                          updateStatus === 'ready' || updateStatus === 'available'
+                          updateAvailable
                             ? 'bg-[hsl(var(--git-added)/0.12)] ring-1 ring-[hsl(var(--git-added))/0.25]'
                             : 'bg-[hsl(var(--surface-3))] ring-1 ring-border/40'
                         }`}
                       >
-                        {updateStatus === 'ready' || updateStatus === 'available' ? (
+                        {updateAvailable ? (
                           <Download
                             size={15}
                             className="text-[hsl(var(--git-added))]"
@@ -1267,81 +1242,91 @@ export function SettingsModal({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[12.5px] font-medium text-foreground">
-                          {updateStatus === 'ready'
-                            ? `Update ready${updateVersion ? ` — v${updateVersion}` : ''}`
-                            : updateStatus === 'available'
-                              ? `Update available${updateVersion ? ` — v${updateVersion}` : ''}`
-                              : updateStatus === 'downloading'
-                                ? 'Downloading update…'
-                                : updateStatus === 'checking'
-                                  ? 'Checking for updates…'
-                                  : 'You’re up to date'}
+                          {updateHeadline(updateStatus)}
                         </p>
                         <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
                           {appVersion ? `Current v${appVersion}` : 'Loading…'}
+                          {updateStatus?.lastCheckAt
+                            ? ` · checked ${formatCheckedAt(updateStatus.lastCheckAt)}`
+                            : ''}
                         </p>
                       </div>
-                      {updateStatus === 'ready' ? (
-                        <button
-                          onClick={() => {
-                            void window.electronAPI.autoUpdateQuitAndInstall();
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium border border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20 hover:bg-primary/15 transition-all duration-150"
-                        >
-                          <Download size={12} strokeWidth={2} />
+                      {updateStatus?.state === 'ready' ? (
+                        <Button size="sm" onClick={() => void onInstallUpdate()}>
+                          <RefreshCw size={12} strokeWidth={1.8} />
                           Restart
-                        </button>
-                      ) : updateStatus === 'available' ? (
-                        <button
-                          onClick={() => {
-                            setUpdateStatus('downloading');
-                            void window.electronAPI.autoUpdateDownload();
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium border border-primary/40 bg-primary/10 text-foreground ring-1 ring-primary/20 hover:bg-primary/15 transition-all duration-150"
-                        >
-                          <Download size={12} strokeWidth={2} />
-                          Download
-                        </button>
+                        </Button>
                       ) : (
-                        <button
-                          onClick={() => {
-                            setUpdateStatus('checking');
-                            void window.electronAPI.autoUpdateCheck().then(async (resp) => {
-                              if (!resp.success) {
-                                setUpdateStatus('idle');
-                                return;
-                              }
-                              // The check may have short-circuited (already
-                              // downloading/ready, etc.) without firing an
-                              // event. Reconcile from the source of truth so
-                              // the UI never stays stuck on "Checking…".
-                              const status = await window.electronAPI.autoUpdateGetStatus?.();
-                              if (status?.success && status.data) {
-                                setUpdateStatus(status.data.state);
-                                setUpdateVersion(status.data.availableVersion);
-                              }
-                            });
-                          }}
-                          disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
-                          className="px-3 py-2 rounded-lg text-[12px] border border-border/60 text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-all duration-150 disabled:opacity-50"
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void onCheckForUpdates()}
+                          disabled={
+                            !updateStatus?.initialized ||
+                            updateStatus.state === 'checking' ||
+                            updateStatus.state === 'downloading'
+                          }
                         >
                           Check
-                        </button>
+                        </Button>
                       )}
                     </div>
+
+                    {updateStatus?.state === 'downloading' && (
+                      <div className="px-4 pb-3.5 -mt-1">
+                        <ProgressBar
+                          percent={updateStatus.percent ?? 0}
+                          label="Downloading update"
+                        />
+                      </div>
+                    )}
+
+                    {updateStatus?.lastError && (
+                      <div className="px-4 pb-3.5 -mt-1">
+                        <p className="text-[11px] text-[hsl(var(--destructive))] leading-snug">
+                          {updateStatus.lastError}
+                        </p>
+                        <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                          Details are in logs/updater.log in your Dash data folder.
+                        </p>
+                      </div>
+                    )}
+
+                    {updateStatus?.availableVersion && (
+                      <div className="px-4 pb-3.5 -mt-1">
+                        <button
+                          onClick={() => {
+                            void window.electronAPI.openExternal(
+                              `https://github.com/syv-ai/dash/releases/tag/v${updateStatus.availableVersion}`,
+                            );
+                          }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors duration-150"
+                        >
+                          Release notes for v{updateStatus.availableVersion}
+                        </button>
+                      </div>
+                    )}
+
+                    {updateStatus && !updateStatus.initialized && (
+                      <div className="px-4 pb-3.5 -mt-1">
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Updates are disabled in development builds.
+                        </p>
+                      </div>
+                    )}
                   </SettingsCard>
 
                   <SettingsCard title="Behavior">
                     <SettingsRow
                       label="Check automatically"
-                      description="When off, Dash won't check in the background."
+                      description="Updates download in the background and install when you quit Dash."
                       control={
                         <Switch enabled={autoUpdateEnabled} onToggle={onAutoUpdateEnabledChange} />
                       }
                     />
                     <SettingsRow
-                      label="Show update notifications"
-                      description="Toast popups when an update is available, downloaded, or fails."
+                      label="Announce new versions"
+                      description="After updating, show a toast linking to what changed."
                       control={
                         <Switch
                           enabled={updateNotificationsEnabled}

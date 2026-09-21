@@ -331,3 +331,94 @@ describe('runtimeStore.init — rtk + cleanup', () => {
     expect(rtkUnsub).toHaveBeenCalled();
   });
 });
+
+describe('runtimeStore.init — auto-update', () => {
+  let api: ReturnType<typeof makeElectronApiMock>;
+  const status = (over: Record<string, unknown> = {}) => ({
+    state: 'idle',
+    availableVersion: null,
+    releaseNotes: null,
+    percent: null,
+    lastCheckAt: null,
+    checkStartedAt: null,
+    lastError: null,
+    initialized: true,
+    ...over,
+  });
+
+  beforeEach(() => {
+    api = makeElectronApiMock();
+    installWindow(api);
+  });
+  afterEach(() => resetWindow());
+
+  it('seeds the status on init so a pending update is visible at once', async () => {
+    const ready = status({ state: 'ready', availableVersion: '0.16.1' });
+    api.autoUpdateGetStatus = vi.fn(() => Promise.resolve({ success: true, data: ready }));
+
+    const { useRuntime } = await freshStores();
+    useRuntime.getState().init();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useRuntime.getState().updateStatus).toEqual(ready);
+  });
+
+  it('follows every pushed status and unsubscribes on cleanup', async () => {
+    let push: ((s: unknown) => void) | null = null;
+    const unsub = vi.fn();
+    api.onAutoUpdateStatus = vi.fn((cb: (s: unknown) => void) => {
+      push = cb;
+      return unsub;
+    });
+
+    const { useRuntime } = await freshStores();
+    const cleanup = useRuntime.getState().init();
+    await Promise.resolve();
+
+    push!(status({ state: 'downloading', percent: 40, availableVersion: '0.16.1' }));
+    expect(useRuntime.getState().updateStatus?.state).toBe('downloading');
+    expect(useRuntime.getState().updateStatus?.percent).toBe(40);
+
+    push!(status({ state: 'ready', percent: 100, availableVersion: '0.16.1' }));
+    expect(useRuntime.getState().updateStatus?.state).toBe('ready');
+
+    cleanup();
+    expect(unsub).toHaveBeenCalled();
+  });
+
+  // A check that no-ops (cooldown, or an update already in hand) emits nothing,
+  // so the action must reconcile or the UI sticks on "Checking…".
+  it('reconciles from getStatus after a check that emitted nothing', async () => {
+    const found = status({ state: 'available', availableVersion: '0.16.1' });
+    api.autoUpdateGetStatus = vi.fn(() => Promise.resolve({ success: true, data: found }));
+
+    const { useRuntime } = await freshStores();
+    await useRuntime.getState().checkForUpdates();
+
+    expect(api.autoUpdateCheck).toHaveBeenCalled();
+    expect(useRuntime.getState().updateStatus).toEqual(found);
+  });
+
+  it('surfaces a failed check instead of swallowing it', async () => {
+    const { toast } = await import('sonner');
+    api.autoUpdateCheck = vi.fn(() => Promise.resolve({ success: false, error: 'offline' }));
+
+    const { useRuntime } = await freshStores();
+    await useRuntime.getState().checkForUpdates();
+
+    expect(toast.error).toHaveBeenCalledWith('offline');
+  });
+
+  it('surfaces a failed install instead of swallowing it', async () => {
+    const { toast } = await import('sonner');
+    api.autoUpdateQuitAndInstall = vi.fn(() =>
+      Promise.resolve({ success: false, error: 'not ready' }),
+    );
+
+    const { useRuntime } = await freshStores();
+    await useRuntime.getState().installUpdate();
+
+    expect(toast.error).toHaveBeenCalledWith('not ready');
+  });
+});
