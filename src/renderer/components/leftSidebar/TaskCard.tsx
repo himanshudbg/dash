@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GitBranch, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import type { Task, ActivityInfo, ContextUsage, PullRequestInfo } from '../../../shared/types';
 import { TaskActions } from '../task/TaskActions';
 import { Tooltip } from '../ui/Tooltip';
@@ -58,8 +58,8 @@ export function TaskCard({
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Hover reveal as a slide: the actions column grows from 0fr to 1fr while
-  // fading and easing in from the right; the percentage / branch icon column
-  // does the reverse. Grid-fraction tracks animate where `width: auto` can't.
+  // fading and easing in from the right; the percentage column does the
+  // reverse. Grid-fraction tracks animate where `width: auto` can't.
   const revealCls = menuOpen
     ? 'grid-cols-[1fr] opacity-100 translate-x-0'
     : 'grid-cols-[0fr] opacity-0 translate-x-1.5 group-hover/task:grid-cols-[1fr] group-hover/task:opacity-100 group-hover/task:translate-x-0';
@@ -147,9 +147,8 @@ export function TaskCard({
         {/* PR on this branch — icon-only link to the remote */}
         {prInfo && <PrBadge prInfo={prInfo} variant="icon" />}
 
-        {/* Right slot: context percentage or branch icon at rest, the action
-            row on hover (or while its menu is open), each sliding over the
-            other. The percentage lives inside the slot (not before it) so no
+        {/* Right slot: context percentage at rest, the action row on hover
+            (or while its menu is open), each sliding over the other. The percentage lives inside the slot (not before it) so no
             flex gap pushes it left; `-mr-0.5` lands its right edge where the
             project rows put their task count. */}
         <div className="flex items-center shrink-0">
@@ -161,9 +160,6 @@ export function TaskCard({
                 <span className="text-[11px] tabular-nums shrink-0 -mr-0.5 text-muted-foreground">
                   {Math.round(ctx!.percentage)}%
                 </span>
-              )}
-              {isActive && !percentVisible && (
-                <GitBranch size={11} className="text-foreground/50 shrink-0" strokeWidth={2} />
               )}
             </div>
           </div>
