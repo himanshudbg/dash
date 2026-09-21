@@ -20,7 +20,9 @@ on:
 jobs:
   version-check:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    # Pinned, as windows-2022 is: the rolling ubuntu label moves to Ubuntu 26 on
+    # 2026-10-19, and the AppImage build leans on the image's system libraries.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -43,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -111,7 +113,7 @@ jobs:
           spctl --assess --verbose=2 "$APP_PATH"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Dash-mac-arm64
           path: |
@@ -122,12 +124,12 @@ jobs:
 
   build-linux:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -149,7 +151,7 @@ jobs:
         run: pnpm exec electron-builder --linux --x64 --publish never
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Dash-linux-x64
           path: |
@@ -166,7 +168,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -188,7 +190,7 @@ jobs:
         run: pnpm exec electron-builder --win --x64 --publish never
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Dash-windows-x64
           path: |
@@ -201,7 +203,7 @@ jobs:
     # workflow_dispatch can run this workflow on any branch; without this
     # guard such a run would publish v<package.json version> from that branch.
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -215,7 +217,7 @@ jobs:
           echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
