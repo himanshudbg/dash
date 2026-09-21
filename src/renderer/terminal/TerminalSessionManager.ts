@@ -13,6 +13,7 @@ import { ptyExitFallback, foreignSessionJobId } from './ptyExitFallback';
 import { clackBlock, clackExitBlock } from './clackLines';
 import { isPromptOnlySnapshot } from './snapshotFilter';
 import { FitScheduler } from './FitScheduler';
+import { MouseModeTracker } from './mouseModeFilter';
 import { TUI_COLS, TUI_ROWS } from '../../shared/tuiProtocol';
 
 // Heap mark above which a terminal trims its own scrollback to relieve pressure.
@@ -57,6 +58,9 @@ export class TerminalSessionManager {
   // 250ms debounce covers panel-transition animations (200ms) to avoid
   // fitting at intermediate sizes; cancels itself when the container hides
   private fitScheduler = new FitScheduler(() => this.fit(), 250);
+  // Swallows Claude Code's redundant mouse-mode re-assertions, which would
+  // otherwise make xterm drop the selection on every TUI growth.
+  private mouseModes = new MouseModeTracker();
   private lastPtyCols = 0;
   private lastPtyRows = 0;
   private lastMemoryCheckAt = 0;
@@ -178,6 +182,17 @@ export class TerminalSessionManager {
       if (sel) this.lastSelection = sel;
     });
 
+    // Keep selections alive across Claude Code re-renders (#144): drop a
+    // DECSET that only re-asserts mouse modes already in effect. See
+    // mouseModeFilter.ts for why xterm would otherwise clear the selection.
+    this.terminal.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) =>
+      this.mouseModes.onSet(params),
+    );
+    this.terminal.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+      this.mouseModes.onReset(params);
+      return false;
+    });
+
     // Track cwd via OSC 7 (emitted by zsh on macOS by default)
     this.terminal.parser.registerOscHandler(7, (data) => {
       try {
@@ -235,6 +250,20 @@ export class TerminalSessionManager {
         return false;
       }
 
+      // Select all: Cmd+A (macOS) or Ctrl+Shift+A (Linux). xterm binds Cmd+A
+      // itself on macOS; handling it here too keeps both platforms explicit and
+      // stops Electron's default Edit menu from also running its selectAll role.
+      if (
+        e.code === 'KeyA' &&
+        !e.altKey &&
+        ((isMac && e.metaKey && !e.ctrlKey && !e.shiftKey) ||
+          (!isMac && e.ctrlKey && e.shiftKey && !e.metaKey))
+      ) {
+        e.preventDefault();
+        this.terminal.selectAll();
+        return false;
+      }
+
       // Find: Cmd+F (macOS) or Ctrl+F (Linux/Win). Intercepted at the xterm
       // layer so the binding fires even while the terminal owns keyboard
       // focus. Caller wires this to the in-terminal search overlay.
@@ -286,6 +315,13 @@ export class TerminalSessionManager {
     this.terminal.onData((data) => {
       window.electronAPI.ptyInput({ id: this.id, data });
     });
+  }
+
+  /** `terminal.reset()` drops every DEC private mode, so the mouse-mode
+   *  tracker must forget them too or the next real DECSET would be swallowed. */
+  private resetTerminal(): void {
+    this.terminal.reset();
+    this.mouseModes.clear();
   }
 
   private async loadGpuAddon() {
@@ -595,7 +631,7 @@ export class TerminalSessionManager {
     }
     this.dataBuffer = null;
     this.ptyStarted = false;
-    this.terminal.reset();
+    this.resetTerminal();
     if (this.currentContainer) {
       await this.attach(this.currentContainer, { autoFocus: true });
     }
@@ -732,7 +768,7 @@ export class TerminalSessionManager {
         await window.electronAPI.ptyKillAwait(this.id);
       }
       this.ptyStarted = false;
-      this.terminal.reset();
+      this.resetTerminal();
       this.setDetached(null);
       await this.startPty();
     }
@@ -1131,7 +1167,7 @@ export class TerminalSessionManager {
         // the client enabled so the pane is a plain terminal again, then
         // hand the pane to the Detached card (TerminalPane).
         this.ptyStarted = false;
-        this.terminal.reset();
+        this.resetTerminal();
         this.setDetached({ exitCode: info.exitCode });
         return;
       }
