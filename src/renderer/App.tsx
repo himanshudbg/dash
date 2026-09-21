@@ -280,6 +280,7 @@ export function App() {
   const showRateLimits = useSettings((s) => s.showRateLimits);
   const showUsageInline = useSettings((s) => s.showUsageInline);
   const showContextUsageOnTaskCards = useSettings((s) => s.showContextUsageOnTaskCards);
+  const showContextBarOnTaskCards = useSettings((s) => s.showContextBarOnTaskCards);
 
   // Rotation — tasks the user cycles through with Ctrl+Tab
   const showActiveTasksSection = useSettings((s) => s.showActiveTasksSection);
@@ -594,7 +595,7 @@ export function App() {
     // renderer's cached terminals (they hold the old cwd) so the panes remount
     // against the new path once the reloaded tasks arrive.
     for (const r of results) {
-      for (const taskId of r.moved) {
+      for (const taskId of [...r.moved, ...r.removed]) {
         await sessionRegistry.dispose(taskId);
         await sessionRegistry.disposeByPrefix(`shell:${taskId}`);
       }
@@ -1136,7 +1137,11 @@ export function App() {
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebar}
             unseenTaskIds={unseenTaskIds}
-            contextUsage={showContextUsageOnTaskCards ? contextUsage : EMPTY_CONTEXT_USAGE}
+            contextUsage={
+              showContextUsageOnTaskCards || showContextBarOnTaskCards
+                ? contextUsage
+                : EMPTY_CONTEXT_USAGE
+            }
             onReorderProjects={handleReorderProjects}
             onReorderTasks={handleReorderTasks}
             onReorderTasksCommit={(projectId, reordered) => {

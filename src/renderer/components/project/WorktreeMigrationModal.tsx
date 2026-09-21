@@ -49,6 +49,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
   const close = useModalClose();
   const [phase, setPhase] = useState<Phase>({ kind: 'confirm' });
   const [dontAsk, setDontAsk] = useState(false);
+  const [removeStale, setRemoveStale] = useState(true);
   const [results, setResults] = useState<WorktreeMigrationResult[]>([]);
   // Projects ticked for this run; the rest are offered again next launch.
   const [selected, setSelected] = useState<Set<string>>(
@@ -59,7 +60,10 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
   const chosen = plan.filter((p) => selected.has(p.projectId));
   const chosenTaskCount = chosen.reduce((n, p) => n + p.tasks.length, 0);
   const movedCount = results.reduce((n, r) => n + r.moved.length, 0);
+  const removedCount = results.reduce((n, r) => n + r.removed.length, 0);
   const failures = results.flatMap((r) => r.failed);
+  const staleCount = chosen.reduce((n, p) => n + p.tasks.filter((t) => t.stale).length, 0);
+  const movableCount = chosenTaskCount - staleCount;
 
   function toggleProject(projectId: string) {
     setSelected((prev) => {
@@ -79,13 +83,17 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
     setPhase({ kind: 'running', done: 0 });
     const collected: WorktreeMigrationResult[] = [];
     for (const project of chosen) {
-      const resp = await window.electronAPI.worktreeMigrate({ projectId: project.projectId });
+      const resp = await window.electronAPI.worktreeMigrate({
+        projectId: project.projectId,
+        removeStale,
+      });
       collected.push(
         resp.success && resp.data
           ? resp.data
           : {
               projectId: project.projectId,
               moved: [],
+              removed: [],
               failed: project.tasks.map((t) => ({
                 taskId: t.taskId,
                 taskName: t.taskName,
@@ -176,6 +184,14 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                             archived
                           </span>
                         )}
+                        {t.stale && (
+                          <span
+                            className="px-1.5 py-[1px] rounded-full bg-[hsl(var(--git-modified))]/15 text-[hsl(var(--git-modified))] text-[9.5px] shrink-0"
+                            title="The folder is no longer a git worktree; only leftover files remain"
+                          >
+                            not a worktree
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -201,8 +217,11 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
               </div>
               <div className="min-w-0">
                 <p className="text-[12.5px] font-medium text-foreground">
-                  Moved {movedCount} of {chosenTaskCount} worktree
-                  {chosenTaskCount === 1 ? '' : 's'}
+                  Moved {movedCount} of {movableCount} worktree
+                  {movableCount === 1 ? '' : 's'}
+                  {removedCount > 0
+                    ? `, removed ${removedCount} stale task${removedCount === 1 ? '' : 's'}`
+                    : ''}
                   {chosen.length < plan.length
                     ? ` (${plan.length - chosen.length} project${
                         plan.length - chosen.length === 1 ? '' : 's'
@@ -238,15 +257,29 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
 
       <div className="px-5 py-3.5 border-t border-border/40 shrink-0 flex items-center gap-3">
         {phase.kind === 'confirm' && (
-          <label className="flex items-center gap-2 text-[11.5px] text-muted-foreground select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dontAsk}
-              onChange={(e) => setDontAsk(e.target.checked)}
-              className="accent-primary"
-            />
-            Don&apos;t ask again
-          </label>
+          <div className="flex flex-col gap-1.5">
+            {staleCount > 0 && (
+              <label className="flex items-center gap-2 text-[11.5px] text-muted-foreground select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={removeStale}
+                  onChange={(e) => setRemoveStale(e.target.checked)}
+                  className="accent-primary"
+                />
+                Remove the {staleCount} task{staleCount === 1 ? '' : 's'} whose folder is no longer
+                a worktree
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-[11.5px] text-muted-foreground select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={dontAsk}
+                onChange={(e) => setDontAsk(e.target.checked)}
+                className="accent-primary"
+              />
+              Don&apos;t ask again
+            </label>
+          </div>
         )}
         <div className="flex gap-2.5 justify-end ml-auto">
           {phase.kind === 'done' ? (

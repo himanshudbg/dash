@@ -78,8 +78,50 @@ describe('buildMigrationPlan', () => {
         archived: false,
         fromPath: '/code/worktrees/fix-login-a1b',
         toPath: '/code/app/.claude/worktrees/fix-login-a1b',
+        stale: false,
       },
     ]);
+  });
+
+  it('flags a legacy directory that is no longer a git worktree as stale', () => {
+    // The dir survived (Dash used to recreate `.claude/` inside it) but git
+    // dropped the worktree: `git worktree move` would fail on it every launch.
+    const plan = buildMigrationPlan(
+      [project()],
+      { p1: [task()] },
+      {
+        ...helpers,
+        pathExists: (p) => p === '/code/worktrees/fix-login-a1b',
+        isWorktreeDir: () => false,
+      },
+    );
+    expect(plan[0]!.tasks[0]!.stale).toBe(true);
+  });
+
+  it('does not call a worktree stale when it was already moved by hand', () => {
+    const plan = buildMigrationPlan(
+      [project()],
+      { p1: [task()] },
+      {
+        ...helpers,
+        pathExists: (p) => p === '/code/app/.claude/worktrees/fix-login-a1b',
+        isWorktreeDir: () => false,
+      },
+    );
+    expect(plan[0]!.tasks[0]!.stale).toBe(false);
+  });
+
+  it('still leaves out tasks whose directory is gone from both locations', () => {
+    const plan = buildMigrationPlan(
+      [project()],
+      { p1: [task()] },
+      {
+        ...helpers,
+        pathExists: () => false,
+        isWorktreeDir: () => false,
+      },
+    );
+    expect(plan).toEqual([]);
   });
 
   it('skips tasks already at the new location, non-worktree tasks, and non-git projects', () => {

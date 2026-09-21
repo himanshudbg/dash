@@ -35,8 +35,12 @@ export function useReleaseNotesToast(): void {
       setLastSeenReleaseNotesVersion(current);
       if (!updateNotificationsEnabled) return;
 
+      // Dismissable: a close button, and it goes away on its own — the
+      // Infinity duration made it impossible to get rid of without clicking
+      // through to the release notes.
       toast(`Dash updated to v${normalizeVersion(current)}`, {
-        duration: Infinity,
+        duration: 20_000,
+        closeButton: true,
         action: {
           label: 'Release notes',
           onClick: () => {

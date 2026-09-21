@@ -367,6 +367,8 @@ function UsageSection({ latestRateLimits }: { latestRateLimits?: RateLimits }) {
   const onShowUsageInlineChange = useSettings((s) => s.setShowUsageInline);
   const showContextUsageOnTaskCards = useSettings((s) => s.showContextUsageOnTaskCards);
   const onShowContextUsageOnTaskCardsChange = useSettings((s) => s.setShowContextUsageOnTaskCards);
+  const showContextBarOnTaskCards = useSettings((s) => s.showContextBarOnTaskCards);
+  const onShowContextBarOnTaskCardsChange = useSettings((s) => s.setShowContextBarOnTaskCards);
   const showTaskTokens = useSettings((s) => s.showTaskTokens);
   const onShowTaskTokensChange = useSettings((s) => s.setShowTaskTokens);
   const showTaskCost = useSettings((s) => s.showTaskCost);
@@ -438,12 +440,22 @@ function UsageSection({ latestRateLimits }: { latestRateLimits?: RateLimits }) {
           control={<Switch enabled={showUsageInline} onToggle={onShowUsageInlineChange} />}
         />
         <SettingsRow
-          label="Context bar on task cards"
-          description="Thin progress bar beneath each task in the left sidebar."
+          label="Context percentage on task cards"
+          description="Context-window usage as a percentage next to each task in the left sidebar."
           control={
             <Switch
               enabled={showContextUsageOnTaskCards}
               onToggle={onShowContextUsageOnTaskCardsChange}
+            />
+          }
+        />
+        <SettingsRow
+          label="Context bar on task cards"
+          description="Thin progress bar beneath each task in the left sidebar."
+          control={
+            <Switch
+              enabled={showContextBarOnTaskCards}
+              onToggle={onShowContextBarOnTaskCardsChange}
             />
           }
         />

@@ -1,10 +1,11 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { WorktreeMigrationProject, WorktreeMigrationResult } from '@shared/types';
 import { DatabaseService } from './DatabaseService';
 import { worktreeService } from './WorktreeService';
-import { listForTask, killPtyAwait } from './ptyManager';
+import { listForTask, killPtyAwait, removeTaskSession } from './ptyManager';
 import { supervisorService } from './SupervisorService';
 import { buildMigrationPlan, isWorktreeLockedError } from './worktreeMigrationPlan';
 
@@ -40,11 +41,21 @@ class WorktreeMigrationServiceImpl {
       getLegacyWorktreesDir: (p) => worktreeService.getLegacyWorktreesDir(p),
       getWorktreesDir: (p) => worktreeService.getWorktreesDir(p),
       pathExists: (p) => fs.existsSync(p),
+      isWorktreeDir: (p) => fs.existsSync(path.join(p, '.git')),
     });
   }
 
-  async migrateProject(projectId: string): Promise<WorktreeMigrationResult> {
-    const result: WorktreeMigrationResult = { projectId, moved: [], failed: [] };
+  /**
+   * Move one project's legacy worktrees. Stale entries (directory left behind
+   * after git dropped the worktree) cannot be moved; with `removeStale` they
+   * are deleted instead — task row, supervisor session and leftover directory
+   * — otherwise they are reported as failures like before.
+   */
+  async migrateProject(
+    projectId: string,
+    opts: { removeStale?: boolean } = {},
+  ): Promise<WorktreeMigrationResult> {
+    const result: WorktreeMigrationResult = { projectId, moved: [], removed: [], failed: [] };
     const group = this.plan().find((p) => p.projectId === projectId);
     if (!group) return result;
 
@@ -52,6 +63,16 @@ class WorktreeMigrationServiceImpl {
 
     for (const task of group.tasks) {
       try {
+        if (task.stale) {
+          if (!opts.removeStale) {
+            throw new Error(
+              `Not a git worktree any more (only leftovers remain): ${task.fromPath}`,
+            );
+          }
+          await this.removeStaleTask(task);
+          result.removed.push(task.taskId);
+          continue;
+        }
         await this.migrateTask(group.projectPath, task);
         result.moved.push(task.taskId);
       } catch (err) {
@@ -99,6 +120,25 @@ class WorktreeMigrationServiceImpl {
 
     await this.gitWorktreeMove(projectPath, task.fromPath, task.toPath);
     DatabaseService.relocateTask(task.taskId, task.toPath, task.fromPath);
+  }
+
+  /**
+   * Delete a stale task: forget its supervisor session (transcript kept), drop
+   * the row, and remove the leftover directory. The directory is only removed
+   * when it still is not a worktree, so a repo that regained one in between is
+   * never touched.
+   */
+  private async removeStaleTask(task: WorktreeMigrationProject['tasks'][number]): Promise<void> {
+    for (const ptyId of listForTask(task.taskId)) {
+      await killPtyAwait(ptyId);
+    }
+    await removeTaskSession(task.taskId).catch((err) =>
+      console.warn(`[WorktreeMigration] session removal failed for ${task.taskName}:`, err),
+    );
+    DatabaseService.deleteTask(task.taskId);
+    if (fs.existsSync(task.fromPath) && !fs.existsSync(path.join(task.fromPath, '.git'))) {
+      fs.rmSync(task.fromPath, { recursive: true, force: true });
+    }
   }
 
   private async gitWorktreeMove(cwd: string, from: string, to: string): Promise<void> {

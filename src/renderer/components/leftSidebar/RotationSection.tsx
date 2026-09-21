@@ -4,6 +4,7 @@ import { useDragReorder } from '../../hooks/useDragReorder';
 import { IconButton } from '../ui/IconButton';
 import { Tooltip } from '../ui/Tooltip';
 import { useRuntime } from '../../stores/runtimeStore';
+import { useSettings } from '../../stores/settingsStore';
 import type { Project, Task, ContextUsage } from '../../../shared/types';
 
 /* ── Rotation (Active Tasks) with sliding highlight ──────── */
@@ -31,6 +32,7 @@ export function RotationSection({
   contextUsage?: Record<string, ContextUsage>;
 }) {
   const taskActivity = useRuntime((s) => s.taskActivity);
+  const showPercent = useSettings((s) => s.showContextUsageOnTaskCards);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [highlight, setHighlight] = useState<{ top: number; height: number } | null>(null);
@@ -220,7 +222,7 @@ export function RotationSection({
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="truncate flex-1 min-w-0">{task.name}</span>
 
-                      {ctx && ctx.percentage > 0 && (
+                      {showPercent && ctx && ctx.percentage > 0 && (
                         <span
                           className="text-[11px] tabular-nums shrink-0 group-hover/rot:hidden text-muted-foreground"
                           title={`Context: ${ctx.used.toLocaleString()} / ${ctx.total.toLocaleString()} tokens (${Math.round(ctx.percentage)}%)`}

@@ -6,6 +6,7 @@ import { UsageBarInline } from '../ui/UsageBar';
 import { MainRepoBadge } from '../ui/MainRepoBadge';
 import { PrBadge } from '../ui/PrBadge';
 import type { DragHandlers } from '../../hooks/useDragReorder';
+import { useSettings } from '../../stores/settingsStore';
 
 interface TaskCardProps {
   task: Task;
@@ -45,6 +46,12 @@ export function TaskCard({
   onDelete,
 }: TaskCardProps) {
   const activityState = activityInfo?.state;
+  // The percentage and the bar are separate preferences; either may be off.
+  const showPercent = useSettings((s) => s.showContextUsageOnTaskCards);
+  const showBar = useSettings((s) => s.showContextBarOnTaskCards);
+  const hasCtx = !!ctx && ctx.percentage > 0;
+  const percentVisible = hasCtx && showPercent;
+  const barVisible = hasCtx && showBar;
 
   // Build tooltip text with tool details when available
   const busyTooltip = activityInfo?.compacting
@@ -126,16 +133,17 @@ export function TaskCard({
         {/* PR on this branch — icon-only link to the remote */}
         {prInfo && <PrBadge prInfo={prInfo} variant="icon" />}
 
-        {/* Context percentage (visible when data available, hidden on hover to show actions) */}
-        {ctx && ctx.percentage > 0 && (
-          <span className="text-[11px] tabular-nums shrink-0 group-hover/task:hidden text-muted-foreground">
-            {Math.round(ctx.percentage)}%
-          </span>
-        )}
-
-        {/* Right slot: branch icon by default, actions on hover */}
+        {/* Right slot: context percentage or branch icon by default, actions on
+            hover. The percentage lives inside the slot (not before it) so no
+            flex gap pushes it left; `-mr-0.5` lands its right edge where the
+            project rows put their task count. */}
         <div className="flex items-center gap-0.5 shrink-0">
-          {isActive && !ctx && (
+          {percentVisible && (
+            <span className="text-[11px] tabular-nums shrink-0 -mr-0.5 group-hover/task:hidden text-muted-foreground">
+              {Math.round(ctx!.percentage)}%
+            </span>
+          )}
+          {isActive && !percentVisible && (
             <GitBranch
               size={11}
               className="text-foreground/50 group-hover/task:hidden"
@@ -162,12 +170,12 @@ export function TaskCard({
       <div
         className="row-start-2 col-start-2 grid transition-[grid-template-rows,opacity] duration-200 ease-out"
         style={{
-          gridTemplateRows: ctx && ctx.percentage > 0 ? '1fr' : '0fr',
-          opacity: ctx && ctx.percentage > 0 ? 1 : 0,
+          gridTemplateRows: barVisible ? '1fr' : '0fr',
+          opacity: barVisible ? 1 : 0,
         }}
       >
         <div className="overflow-hidden">
-          {ctx && ctx.percentage > 0 && (
+          {barVisible && (
             <UsageBarInline
               percentage={ctx.percentage}
               height={2}

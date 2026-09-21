@@ -264,6 +264,13 @@ export function writeHookSettings(cwd: string, ptyId: string): HookWriteResult {
   dashEntries.SessionStart = sessionStartEntries;
 
   try {
+    // Only ever create `.claude/` inside an existing working directory. A
+    // recursive mkdir through a missing cwd used to leave a husk (just
+    // `.claude/`) where a pruned worktree had been, which then kept the
+    // worktree-migration dialog offering a move that could only fail.
+    if (!fs.existsSync(cwd)) {
+      return { ok: false, settingsPath, error: `working directory does not exist: ${cwd}` };
+    }
     if (!fs.existsSync(claudeDir)) {
       fs.mkdirSync(claudeDir, { recursive: true });
     }

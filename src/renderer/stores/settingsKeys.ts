@@ -21,6 +21,7 @@ export interface SettingsState {
   showRateLimits: boolean;
   showUsageInline: boolean;
   showContextUsageOnTaskCards: boolean;
+  showContextBarOnTaskCards: boolean;
   showActiveTasksSection: boolean;
   showProjectTokens: boolean;
   desktopNotification: boolean;
@@ -89,6 +90,7 @@ export const SETTINGS_REGISTRY: RegistryEntry[] = [
   entry('showRateLimits', 'showRateLimits', boolNotFalse()),
   entry('showUsageInline', 'showUsageInline', boolNotFalse()),
   entry('showContextUsageOnTaskCards', 'showContextUsageOnTaskCards', boolNotFalse()),
+  entry('showContextBarOnTaskCards', 'showContextBarOnTaskCards', boolNotFalse()),
   entry('showActiveTasksSection', 'showActiveTasksSection', boolNotFalse()),
   entry('showProjectTokens', 'showProjectTokens', boolDefaultTrue()),
   entry('desktopNotification', 'desktopNotification', boolDefaultFalse()),

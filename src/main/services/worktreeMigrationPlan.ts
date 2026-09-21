@@ -14,6 +14,10 @@ export interface MigrationPathHelpers {
    *  worktree is gone from both locations has nothing to move and is left
    *  out, so a stale task row never blocks or re-triggers the dialog. */
   pathExists?: (p: string) => boolean;
+  /** Whether a directory is a git worktree (has a `.git` file or dir). A
+   *  legacy directory that exists but fails this is `stale`: git already
+   *  dropped it and `git worktree move` would only ever fail on it. */
+  isWorktreeDir?: (p: string) => boolean;
 }
 
 /** True when `candidate` is strictly inside `dir` (not equal, not a sibling). */
@@ -39,16 +43,22 @@ export function buildMigrationPlan(
     const legacyDir = helpers.getLegacyWorktreesDir(project.path);
     const targetDir = helpers.getWorktreesDir(project.path);
     const exists = helpers.pathExists ?? (() => true);
+    const isWorktree = helpers.isWorktreeDir ?? (() => true);
     const tasks = (tasksByProject[project.id] ?? [])
       .filter((t) => t.useWorktree && isInsideDir(legacyDir, t.path))
-      .map((t) => ({
-        taskId: t.id,
-        taskName: t.name,
-        branch: t.branch,
-        archived: t.archivedAt !== null,
-        fromPath: path.resolve(t.path),
-        toPath: path.join(targetDir, path.basename(path.resolve(t.path))),
-      }))
+      .map((t) => {
+        const fromPath = path.resolve(t.path);
+        const toPath = path.join(targetDir, path.basename(fromPath));
+        return {
+          taskId: t.id,
+          taskName: t.name,
+          branch: t.branch,
+          archived: t.archivedAt !== null,
+          fromPath,
+          toPath,
+          stale: exists(fromPath) && !exists(toPath) && !isWorktree(fromPath),
+        };
+      })
       .filter((t) => exists(t.fromPath) || exists(t.toPath));
     if (tasks.length === 0) continue;
     plan.push({

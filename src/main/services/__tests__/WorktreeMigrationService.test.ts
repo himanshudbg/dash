@@ -26,14 +26,21 @@ vi.mock('../DatabaseService', () => ({
       t.path = newPath;
       return t;
     },
+    deleteTask: (id: string) => {
+      db.tasks = db.tasks.filter((x) => x.id !== id);
+    },
   },
 }));
 
 const killed: string[] = [];
+const sessionsRemoved: string[] = [];
 vi.mock('../ptyManager', () => ({
   listForTask: (taskId: string) => [taskId, `shell:${taskId}`],
   killPtyAwait: async (id: string) => {
     killed.push(id);
+  },
+  removeTaskSession: async (taskId: string) => {
+    sessionsRemoved.push(taskId);
   },
 }));
 
@@ -47,7 +54,16 @@ beforeEach(() => {
   db.projects = [];
   db.tasks = [];
   killed.length = 0;
+  sessionsRemoved.length = 0;
 });
+
+/** Turn the legacy worktree into the husk Dash used to leave behind: git has
+ *  dropped it, only a `.claude/` folder remains at the old path. */
+function makeStale(repo: string, from: string) {
+  git(repo, 'worktree', 'remove', '--force', from);
+  fs.mkdirSync(path.join(from, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(from, '.claude', 'settings.local.json'), '{}');
+}
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, stdio: 'pipe' }).toString();
@@ -117,6 +133,41 @@ function legacySetup(name = 'fix-login-a1b') {
 }
 
 describe('WorktreeMigrationService', () => {
+  it('marks a legacy dir that git no longer tracks as stale and fails it unless removal is requested', async () => {
+    const { repo, from } = legacySetup();
+    makeStale(repo, from);
+
+    expect(worktreeMigrationService.plan()[0]!.tasks[0]!.stale).toBe(true);
+
+    const result = await worktreeMigrationService.migrateProject('p1');
+    expect(result.moved).toEqual([]);
+    expect(result.removed).toEqual([]);
+    expect(result.failed).toEqual([
+      expect.objectContaining({
+        taskId: 't1',
+        error: expect.stringContaining('Not a git worktree'),
+      }),
+    ]);
+    expect(fs.existsSync(from)).toBe(true);
+    expect(db.tasks).toHaveLength(1);
+  });
+
+  it('removes a stale task on request: session, row and leftover directory', async () => {
+    const { repo, legacyDir, from } = legacySetup();
+    makeStale(repo, from);
+
+    const result = await worktreeMigrationService.migrateProject('p1', { removeStale: true });
+
+    expect(result).toEqual({ projectId: 'p1', moved: [], removed: ['t1'], failed: [] });
+    expect(killed).toEqual(['t1', 'shell:t1']);
+    expect(sessionsRemoved).toEqual(['t1']);
+    expect(db.tasks).toEqual([]);
+    expect(fs.existsSync(from)).toBe(false);
+    // Nothing else left at the old location, so the legacy dir goes too.
+    expect(fs.existsSync(legacyDir)).toBe(false);
+    expect(worktreeMigrationService.plan()).toEqual([]);
+  });
+
   it('plans only legacy-layout worktree tasks', () => {
     const { from, to } = legacySetup();
     const plan = worktreeMigrationService.plan();
@@ -132,7 +183,7 @@ describe('WorktreeMigrationService', () => {
 
     const result = await worktreeMigrationService.migrateProject('p1');
 
-    expect(result).toEqual({ projectId: 'p1', moved: ['t1'], failed: [] });
+    expect(result).toEqual({ projectId: 'p1', moved: ['t1'], removed: [], failed: [] });
     expect(killed).toEqual(['t1', 'shell:t1']);
     expect(fs.existsSync(from)).toBe(false);
     expect(fs.readFileSync(path.join(to, 'work.txt'), 'utf-8')).toBe('uncommitted work\n');
@@ -182,7 +233,7 @@ describe('WorktreeMigrationService', () => {
 
     const result = await worktreeMigrationService.migrateProject('p1');
 
-    expect(result).toEqual({ projectId: 'p1', moved: ['t1'], failed: [] });
+    expect(result).toEqual({ projectId: 'p1', moved: ['t1'], removed: [], failed: [] });
     expect(db.tasks[0]!.path).toBe(to);
     expect(db.tasks[0]!.previousPath).toBe(from);
   });

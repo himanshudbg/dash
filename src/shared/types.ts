@@ -105,6 +105,10 @@ export interface WorktreeMigrationTask {
   archived: boolean;
   fromPath: string;
   toPath: string;
+  /** The legacy directory exists but is no longer a git worktree (no `.git`
+   *  inside — git pruned or removed it and only leftovers remain). Nothing to
+   *  move; the dialog offers to remove the task instead. */
+  stale: boolean;
 }
 
 /** Per-project group of the migration plan (only projects with legacy tasks). */
@@ -120,6 +124,8 @@ export interface WorktreeMigrationProject {
 export interface WorktreeMigrationResult {
   projectId: string;
   moved: string[];
+  /** Stale tasks deleted (row + leftover directory) at the user's request. */
+  removed: string[];
   failed: Array<{ taskId: string; taskName: string; error: string }>;
 }
 
