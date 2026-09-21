@@ -90,6 +90,26 @@ function splitV2Header(rec: string, n: number): { fields: string[]; path: string
 }
 
 /**
+ * Parse `git worktree list --porcelain` into branch name → worktree path.
+ * Detached worktrees hold no branch and are skipped. Prunable entries (the
+ * directory is gone but nothing pruned yet) stay in: git still refuses a
+ * second worktree on their branch until `git worktree prune` runs.
+ */
+export function parseWorktreeList(out: string): Map<string, string> {
+  const map = new Map<string, string>();
+  let worktreePath: string | null = null;
+  for (const line of out.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      worktreePath = line.slice('worktree '.length);
+      continue;
+    }
+    const match = line.match(/^branch refs\/heads\/(.+)$/);
+    if (match && worktreePath) map.set(match[1]!, worktreePath);
+  }
+  return map;
+}
+
+/**
  * Parse `git status --porcelain=v2 -z` output into FileChange entries.
  *
  * Why `-z` and a dedicated parser: in the default (LF-terminated) porcelain v2,
@@ -176,22 +196,18 @@ export class GitService {
    * Fetch from remote and list remote branches sorted by most recent commit.
    */
   /**
-   * Names of branches currently checked out in the primary repo or any linked
-   * worktree. Git won't allow a branch into a second worktree, so the caller can
-   * flag these as unavailable for worktree-existing.
+   * Branches currently checked out in the primary repo or any linked worktree,
+   * mapped to the worktree path holding each. Git won't allow a branch into a
+   * second worktree, so the caller can flag these as unavailable for
+   * worktree-existing — and say who holds them.
    */
-  static async getCheckedOutBranches(cwd: string): Promise<Set<string>> {
-    const names = new Set<string>();
+  static async getCheckedOutBranches(cwd: string): Promise<Map<string, string>> {
     try {
-      const out = await git(cwd, ['worktree', 'list', '--porcelain']);
-      for (const line of out.split('\n')) {
-        const match = line.match(/^branch refs\/heads\/(.+)$/);
-        if (match) names.add(match[1]!);
-      }
+      return parseWorktreeList(await git(cwd, ['worktree', 'list', '--porcelain']));
     } catch {
       // Best effort — an unreadable worktree list just means nothing is flagged.
+      return new Map();
     }
-    return names;
   }
 
   static async fetchAndListBranches(cwd: string): Promise<BranchInfo[]> {
@@ -277,6 +293,7 @@ export class GitService {
           shortHash: shortHash || '',
           relativeDate: dateParts.join('\t') || '',
           checkedOut: checkedOut.has(name),
+          checkedOutPath: checkedOut.get(name),
         });
       }
 
@@ -312,6 +329,7 @@ export class GitService {
           shortHash: shortHash || '',
           relativeDate: dateParts.join('\t') || '',
           checkedOut: checkedOut.has(name),
+          checkedOutPath: checkedOut.get(name),
         });
       }
 

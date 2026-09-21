@@ -335,6 +335,9 @@ export interface BranchInfo {
   // worktree. Git refuses a second worktree on an already-checked-out branch, so
   // the New Task modal steers worktree-existing away from these.
   checkedOut?: boolean;
+  // The worktree holding it (the project path itself for the primary checkout),
+  // so the modal can say *who* has the branch instead of a bare "in use".
+  checkedOutPath?: string;
 }
 
 // ── Git Types ────────────────────────────────────────────────

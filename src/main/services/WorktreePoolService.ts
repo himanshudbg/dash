@@ -238,11 +238,20 @@ export class WorktreePoolService {
           }
         }
 
+        // Drop worktree records whose directory is gone first: git refuses to
+        // delete a branch it still believes a worktree holds, and lists it as
+        // "+ _reserve/x" — which used to leave the branch behind forever.
+        try {
+          await execFileAsync('git', ['worktree', 'prune'], { cwd: project.path });
+        } catch {
+          // Best effort
+        }
+
         // Delete orphaned reserve branches
         try {
           const { stdout } = await execFileAsync(
             'git',
-            ['branch', '--list', `${RESERVE_PREFIX}/*`],
+            ['branch', '--list', '--format=%(refname:short)', `${RESERVE_PREFIX}/*`],
             { cwd: project.path },
           );
           const activeReserveBranches = new Set([...this.reserves.values()].map((r) => r.branch));
@@ -258,13 +267,6 @@ export class WorktreePoolService {
               // Best effort
             }
           }
-        } catch {
-          // Best effort
-        }
-
-        // Prune
-        try {
-          await execFileAsync('git', ['worktree', 'prune'], { cwd: project.path });
         } catch {
           // Best effort
         }

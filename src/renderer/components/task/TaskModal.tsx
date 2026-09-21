@@ -18,6 +18,8 @@ import { getTaskCreatability } from './taskModalCreatability';
 import { Expandable } from '../ui/Expandable';
 import { Segmented } from '../ui/Segmented';
 import { BranchPrPicker } from './BranchPrPicker';
+import { findBranchHolder, describeBranchHolder } from './branchHolder';
+import { useProjects } from '../../stores/projectsStore';
 
 /**
  * Task creation modes. Each variant carries only the fields that are meaningful
@@ -292,6 +294,14 @@ function TaskModalBody({
   // and steer toward "Create new branch". In-place checkout is exempt: switching
   // the primary repo to its own current branch is legal.
   const branchInUse = useWorktree && !createNewBranch && !!selectedBranch?.checkedOut;
+  // Name the holder: the project's own checkout, a (possibly archived) task,
+  // or a foreign worktree. `tasksByProject` includes archived tasks.
+  const projectTasks = useProjects((s) => (projectId ? s.tasksByProject[projectId] : undefined));
+  const branchHolder = branchInUse
+    ? describeBranchHolder(
+        findBranchHolder(selectedBranch?.checkedOutPath, projectPath, projectTasks ?? []),
+      )
+    : '';
 
   // The PR head has been fetched to `branch`. Drive the existing flow on it,
   // honoring the current mode: in "Create new branch" it becomes the base for a
@@ -601,8 +611,8 @@ function TaskModalBody({
                     />
                     <span className="text-muted-foreground/60">
                       <span className="font-mono text-foreground/70">{selectedBranch?.name}</span>{' '}
-                      is already checked out. Git allows a branch in only one worktree at a time, so
-                      turn on{' '}
+                      is already checked out{branchHolder ? ` ${branchHolder}` : ''}. Git allows a
+                      branch in only one worktree at a time, so turn on{' '}
                       <span className="font-medium text-foreground/70">Create new branch</span> to
                       start one from it, or pick a branch that&apos;s free.
                     </span>
