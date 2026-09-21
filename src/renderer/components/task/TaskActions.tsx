@@ -1,5 +1,12 @@
-import { Code2, Power, Settings, Archive, Trash2 } from 'lucide-react';
+import { Code2, Power, Settings, Archive, Trash2, MoreHorizontal } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/DropdownMenu';
 
 interface TaskActionsProps {
   /** Show the "Put to sleep" (power) button only when the task has a live session. */
@@ -9,13 +16,17 @@ interface TaskActionsProps {
   onSettings: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  /** Fires when the "…" menu opens or closes, so a hover-revealed parent can
+   *  stay visible while the menu is up even though the pointer has left. */
+  onMenuOpenChange?: (open: boolean) => void;
 }
 
 /**
  * The shared task-card action toolbar — rendered identically in the left-sidebar
- * TaskCard and the ProjectOverview cards. Each button stops propagation so it
- * never triggers the card's own select handler. Parents own the positioning and
- * hover-reveal; this renders just the button row.
+ * TaskCard and the ProjectOverview cards: the one-click "Put to sleep" button
+ * plus a "…" menu for the rest (IDE, settings, archive, delete). Every control
+ * stops propagation so it never triggers the card's own select handler.
+ * Parents own the positioning and hover-reveal; this renders just the row.
  */
 export function TaskActions({
   hasActiveSession,
@@ -24,19 +35,10 @@ export function TaskActions({
   onSettings,
   onArchive,
   onDelete,
+  onMenuOpenChange,
 }: TaskActionsProps) {
   return (
     <div className="flex items-center gap-0.5">
-      <IconButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenIde();
-        }}
-        title="Open in IDE"
-        size="sm"
-      >
-        <Code2 size={12} strokeWidth={1.8} />
-      </IconButton>
       {hasActiveSession && (
         <IconButton
           onClick={(e) => {
@@ -49,37 +51,37 @@ export function TaskActions({
           <Power size={12} strokeWidth={1.8} />
         </IconButton>
       )}
-      <IconButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onSettings();
-        }}
-        title="Task settings"
-        size="sm"
-      >
-        <Settings size={12} strokeWidth={1.8} />
-      </IconButton>
-      <IconButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onArchive();
-        }}
-        title="Archive task"
-        size="sm"
-      >
-        <Archive size={12} strokeWidth={1.8} />
-      </IconButton>
-      <IconButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        title="Delete task"
-        variant="destructive"
-        size="sm"
-      >
-        <Trash2 size={12} strokeWidth={1.8} />
-      </IconButton>
+      <DropdownMenu onOpenChange={onMenuOpenChange}>
+        <DropdownMenuTrigger asChild>
+          <IconButton onClick={(e) => e.stopPropagation()} title="More actions" size="sm">
+            <MoreHorizontal size={12} strokeWidth={1.8} />
+          </IconButton>
+        </DropdownMenuTrigger>
+        {/* Items render in a portal, but React events still bubble through the
+            tree to the card's onClick — stop them here. */}
+        <DropdownMenuContent align="end" className="min-w-36" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onSelect={onOpenIde}>
+            <Code2 size={13} strokeWidth={1.8} className="text-muted-foreground" />
+            Open in IDE
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onSettings}>
+            <Settings size={13} strokeWidth={1.8} className="text-muted-foreground" />
+            Task settings
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onArchive}>
+            <Archive size={13} strokeWidth={1.8} className="text-muted-foreground" />
+            Archive
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={onDelete}
+            className="text-destructive focus:bg-destructive/10 data-highlighted:bg-destructive/10"
+          >
+            <Trash2 size={13} strokeWidth={1.8} />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

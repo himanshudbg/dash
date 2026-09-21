@@ -123,6 +123,8 @@ export function ProjectOverview({
   const detectProjectPrs = useGit((s) => s.detectProjectPrs);
   const projectTokens = useRuntime((s) => s.projectTokenStats[project.id]);
   const [showArchived, setShowArchived] = useState(false);
+  // Card whose "…" menu is open: its toolbar stays visible off-hover.
+  const [menuOpenTaskId, setMenuOpenTaskId] = useState<string | null>(null);
   const busyCount = tasks.filter((t) => taskActivity[t.id]?.state === 'busy').length;
   const waitingCount = tasks.filter((t) => taskActivity[t.id]?.state === 'waiting').length;
   const errorCount = tasks.filter((t) => taskActivity[t.id]?.state === 'error').length;
@@ -406,7 +408,13 @@ export function ProjectOverview({
                           />
                         )}
                       </div>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div
+                        className={`transition-opacity shrink-0 ${
+                          menuOpenTaskId === task.id
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
                         <TaskActions
                           hasActiveSession={!!activity?.state}
                           onOpenIde={() => void openInIde(task.path || project.path)}
@@ -414,6 +422,7 @@ export function ProjectOverview({
                           onSettings={() => onTaskSettings(task.id)}
                           onArchive={() => onArchiveTask(task.id)}
                           onDelete={() => onDeleteTask(task.id)}
+                          onMenuOpenChange={(open) => setMenuOpenTaskId(open ? task.id : null)}
                         />
                       </div>
                     </div>
