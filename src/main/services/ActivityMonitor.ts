@@ -123,6 +123,9 @@ class ActivityMonitorImpl {
    * carry the tool label and land seconds earlier. `waiting`, `error` and
    * `stopped` come only from the supervisor (or the permission hook) and
    * always apply, as does anything that lifts a `stopped`/`error` state.
+   * One more asymmetry: for a task whose hooks reach us, the supervisor may
+   * take it to idle (a lost Stop hook) but never to busy — its `status` stays
+   * `busy` long after a turn has ended, and hooks land first anyway.
    */
   applySupervisor(ptyId: string, activity: SupervisorActivity, pollIntervalMs: number): void {
     let a = this.activities.get(ptyId);
@@ -137,6 +140,13 @@ class ActivityMonitorImpl {
     const hookDriven = a.state === 'busy' || a.state === 'idle' || a.state === 'waiting';
     const next = activity.state;
     if ((next === 'busy' || next === 'idle') && hooksFresh && hookDriven) return;
+    // The listing's `status` goes stale after a turn ends — a session that had
+    // been sitting at the prompt for ten minutes still reported `busy`, and a
+    // `done` job did so for hours. So for a task whose hooks talk to us
+    // (registered, lastHookTime set — entries the listing created carry 0) the
+    // supervisor never *promotes* to busy: hooks own that transition. It still
+    // drives busy for listing-only tasks, which have no hooks to speak.
+    if (next === 'busy' && hookDriven && a.lastHookTime > 0) return;
 
     const nextError = next === 'error' ? (activity.error ?? a.error) : null;
     const nextDetail = activity.detail ?? null;

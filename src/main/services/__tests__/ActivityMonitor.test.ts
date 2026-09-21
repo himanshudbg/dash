@@ -282,6 +282,25 @@ describe('ActivityMonitor — supervisor reconcile (applySupervisor)', () => {
     expect(activityMonitor.getAll()['t1']!.detail).toBeUndefined();
   });
 
+  // The listing's `status` stays `busy` long after a turn ends (observed: ten
+  // minutes at the prompt, and a `done` job for hours). Once a task's hooks
+  // reach us they own the idle → busy transition; the listing may not undo a
+  // Stop or an Escape interrupt after the freshness window closes.
+  it('never promotes a hook-driven idle to busy, even after the freshness window', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setBusy('t1');
+    activityMonitor.setIdle('t1');
+    vi.advanceTimersByTime(POLL + 1);
+    activityMonitor.applySupervisor('t1', { state: 'busy' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+  });
+
+  it('still drives busy for a listing-only task that has no hooks', () => {
+    activityMonitor.applySupervisor('t2', { state: 'idle' }, POLL);
+    activityMonitor.applySupervisor('t2', { state: 'busy' }, POLL);
+    expect(activityMonitor.getAll()['t2']!.state).toBe('busy');
+  });
+
   it('hooks clear the supervisor detail when they move the state', () => {
     activityMonitor.applySupervisor('t1', { state: 'stopped', detail: 'Sleeping' }, POLL);
     activityMonitor.setBusy('t1');
