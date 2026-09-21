@@ -7,7 +7,7 @@ import { EditorPane } from './EditorPane';
 import type { EditorView } from './types';
 import type { DiffEditorModalProps } from './DiffEditorModal';
 import { useEditorViewData } from './data/useEditorViewData';
-import { resolveHeadSentinel, pickFirstChangedFile } from './data/viewData';
+import { pickFirstChangedFile } from './data/viewData';
 import { readStoredView, writeStoredView } from './data/viewPersistence';
 import { useCommentsStore } from '../../stores/commentsStore';
 import { commentScope, commentCountsByScope } from './comments/commentScope';
@@ -26,8 +26,10 @@ export function DiffEditor({
 }: DiffEditorModalProps) {
   const gitStatus = useGit((s) => s.gitStatus);
   // View precedence: an explicit caller intent (initialView) wins, so clicking
-  // a specific file always shows its working diff and "open at HEAD" is honored.
-  // Otherwise restore the last view for this repo, falling back to working.
+  // a specific file always shows its working diff and opening a clean tree
+  // lands in the editable working view even if the last stored view was a
+  // commit. Otherwise restore the last view for this repo, falling back to
+  // working.
   const [view, setView] = useState<EditorView>(() => {
     if (initialView) return initialView;
     return readStoredView(cwd) ?? { kind: 'working', ref: initialStaged ? 'index' : 'HEAD' };
@@ -50,15 +52,7 @@ export function DiffEditor({
     defaultBase,
   } = useEditorViewData(cwd, view, workingFiles);
 
-  // Resolve the 'HEAD' sentinel that callers can pass to mean "latest commit"
-  // before they know its sha. Once commits arrive, swap to the concrete hash
-  // so the drawer highlight matches.
-  useEffect(() => {
-    setView((current) => resolveHeadSentinel(current, commits));
-  }, [commits]);
-
-  // Persist the active view per-repo so reopening lands back here. The 'HEAD'
-  // sentinel is skipped inside writeStoredView until it resolves to a sha.
+  // Persist the active view per-repo so reopening lands back here.
   useEffect(() => {
     writeStoredView(cwd, view);
   }, [cwd, view]);
@@ -184,7 +178,6 @@ export function DiffEditor({
             commentCounts={commentCounts}
             commits={commits}
             commitsLoading={commitsLoading}
-            showWorkingTreeRow={workingFiles.length > 0}
             commentCountByScope={commentCountByScope}
             view={view}
             onSelectView={changeView}

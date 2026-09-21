@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
-import { ChevronDown, ChevronRight, GitCommit, History, ListFilter, EyeOff } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCommit, History, ListFilter } from 'lucide-react';
 import type { FileChange, FileChangeStatus } from '../../../shared/types';
 import { formatRelativeTime } from '@shared/relativeTime';
 import type { CommitSummary, EditorView } from './types';
@@ -8,7 +8,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '../ui/Popover';
 import { Tooltip } from '../ui/Tooltip';
 
 interface EditorSidebarProps {
-  /** Repo root — needed to lazily list gitignored files for the tree toggle. */
+  /** Repo root — needed to lazily list gitignored files under "show all files". */
   cwd: string;
   /** All file paths in the current view's source (whole repo, sorted). */
   allPaths: string[];
@@ -23,8 +23,6 @@ interface EditorSidebarProps {
 
   commits: CommitSummary[];
   commitsLoading: boolean;
-  /** Whether to surface the "Working tree" pinned entry in the commits drawer. */
-  showWorkingTreeRow: boolean;
   /** Comment count per scope ('live' / 'commit:<hash>') → badge on each row. */
   commentCountByScope: Map<string, number>;
   view: EditorView;
@@ -33,7 +31,6 @@ interface EditorSidebarProps {
 
 const COMMITS_DRAWER_KEY = 'diffEditor.commitsDrawerSize';
 const CHANGED_ONLY_KEY = 'diffEditor.changedOnly';
-const SHOW_IGNORED_KEY = 'diffEditor.showIgnored';
 
 export function EditorSidebar(props: EditorSidebarProps) {
   const initialDrawerSize = parseInitial(localStorage.getItem(COMMITS_DRAWER_KEY), 35);
@@ -64,7 +61,6 @@ export function EditorSidebar(props: EditorSidebarProps) {
           <CommitsDrawer
             commits={props.commits}
             loading={props.commitsLoading}
-            showWorkingTreeRow={props.showWorkingTreeRow}
             commentCountByScope={props.commentCountByScope}
             view={props.view}
             onSelectView={props.onSelectView}
@@ -256,22 +252,15 @@ function FileTreePanel({
       return next;
     });
 
-  // Ignored files are a working-tree concept, so the toggle only applies there.
-  const ignoredAvailable = view.kind === 'working';
-  const [showIgnored, setShowIgnored] = useState<boolean>(
-    () => localStorage.getItem(SHOW_IGNORED_KEY) === 'true',
-  );
-  const toggleShowIgnored = () =>
-    setShowIgnored((v) => {
-      const next = !v;
-      localStorage.setItem(SHOW_IGNORED_KEY, String(next));
-      return next;
-    });
+  // "Show all files" means every local file, gitignored ones included, so the
+  // user can reach a local-only config or scratch file. Ignored files are a
+  // working-tree concept (a commit's tree can't contain them), so the fetch is
+  // gated on the working view; git collapses fully-ignored directories to one
+  // entry, which keeps `node_modules/` from flooding the tree.
+  const showIgnored = !changedOnly && view.kind === 'working';
   const [ignoredPaths, setIgnoredPaths] = useState<string[]>([]);
-  // Fetch gitignored paths lazily — only when the toggle is on and we're in the
-  // working view. Cheap to re-run on cwd change; git collapses ignored dirs.
   useEffect(() => {
-    if (!showIgnored || !ignoredAvailable) {
+    if (!showIgnored) {
       setIgnoredPaths([]);
       return;
     }
@@ -283,14 +272,14 @@ function FileTreePanel({
     return () => {
       cancelled = true;
     };
-  }, [showIgnored, ignoredAvailable, cwd]);
+  }, [showIgnored, cwd]);
 
   // In changed-only mode, seed the tree from an empty repo-path set so
   // buildRepoTree's union reduces to just the changed files and their parent
-  // folders (unchanged siblings never enter the tree). Ignored files aren't
-  // changes, so they're likewise excluded there.
+  // folders (unchanged siblings never enter the tree). ignoredPaths is already
+  // empty in that mode.
   const tree = useMemo(
-    () => buildRepoTree(changedOnly ? [] : paths, changedFiles, changedOnly ? [] : ignoredPaths),
+    () => buildRepoTree(changedOnly ? [] : paths, changedFiles, ignoredPaths),
     [changedOnly, paths, changedFiles, ignoredPaths],
   );
   const totals = useMemo(() => {
@@ -324,22 +313,6 @@ function FileTreePanel({
           )}
         </span>
         <span className="flex items-center gap-0.5">
-          {ignoredAvailable && (
-            <Tooltip content={showIgnored ? 'Hide ignored files' : 'Show ignored files'}>
-              <button
-                type="button"
-                onClick={toggleShowIgnored}
-                aria-pressed={showIgnored}
-                className={`shrink-0 p-1 rounded transition-colors ${
-                  showIgnored
-                    ? 'text-primary'
-                    : 'text-muted-foreground/50 hover:text-foreground hover:bg-[hsl(var(--surface-2)/0.6)]'
-                }`}
-              >
-                <EyeOff size={13} strokeWidth={1.8} />
-              </button>
-            </Tooltip>
-          )}
           <Tooltip content={changedOnly ? 'Show all files' : 'Show changed files only'}>
             <button
               type="button"
@@ -591,7 +564,6 @@ function FileEntry({
 interface CommitsDrawerProps {
   commits: CommitSummary[];
   loading: boolean;
-  showWorkingTreeRow: boolean;
   commentCountByScope: Map<string, number>;
   view: EditorView;
   onSelectView: (view: EditorView) => void;
@@ -600,7 +572,6 @@ interface CommitsDrawerProps {
 function CommitsDrawer({
   commits,
   loading,
-  showWorkingTreeRow,
   commentCountByScope,
   view,
   onSelectView,
@@ -627,24 +598,24 @@ function CommitsDrawer({
         ref={listRef}
         className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable scrollbar-thin-hover pb-2 px-1"
       >
-        {showWorkingTreeRow && (
-          <button
-            type="button"
-            data-active={workingActive}
-            onClick={() => onSelectView({ kind: 'working', ref: 'HEAD' })}
-            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-left transition-colors ${
-              workingActive
-                ? 'bg-primary/15 text-primary'
-                : 'text-foreground/85 hover:bg-[hsl(var(--surface-2)/0.6)]'
-            }`}
-          >
-            <GitCommit size={11} strokeWidth={1.8} className="opacity-60 shrink-0" />
-            <span className="truncate flex-1 font-mono text-[11.5px]">Working tree</span>
-            {(commentCountByScope.get('live') ?? 0) > 0 && (
-              <CommentBadge count={commentCountByScope.get('live')!} />
-            )}
-          </button>
-        )}
+        {/* Always pinned, even on a clean tree: it is the only editable view
+            and the way back from a commit. */}
+        <button
+          type="button"
+          data-active={workingActive}
+          onClick={() => onSelectView({ kind: 'working', ref: 'HEAD' })}
+          className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-left transition-colors ${
+            workingActive
+              ? 'bg-primary/15 text-primary'
+              : 'text-foreground/85 hover:bg-[hsl(var(--surface-2)/0.6)]'
+          }`}
+        >
+          <GitCommit size={11} strokeWidth={1.8} className="opacity-60 shrink-0" />
+          <span className="truncate flex-1 font-mono text-[11.5px]">Working tree</span>
+          {(commentCountByScope.get('live') ?? 0) > 0 && (
+            <CommentBadge count={commentCountByScope.get('live')!} />
+          )}
+        </button>
         {loading && commits.length === 0 && (
           <div className="px-3 py-2 text-[11px] text-muted-foreground/40">Loading…</div>
         )}

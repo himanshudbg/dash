@@ -3,6 +3,8 @@ import type { EditorView } from '../types';
 
 export type LoadState =
   | { kind: 'loading' }
+  /** No file selected (e.g. a clean working tree has nothing to auto-pick). */
+  | { kind: 'empty' }
   | { kind: 'error'; message: string }
   | {
       kind: 'loaded';
@@ -40,7 +42,7 @@ export function useFileLoad(
     let cancelled = false;
     async function load() {
       if (!filePath) {
-        setState({ kind: 'loading' });
+        setState({ kind: 'empty' });
         return;
       }
       setState({ kind: 'loading' });

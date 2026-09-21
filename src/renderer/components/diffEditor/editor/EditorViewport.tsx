@@ -66,6 +66,13 @@ export function EditorViewport({
           </div>
         </div>
       )}
+      {currentState.kind === 'empty' && (
+        <div className="flex items-center justify-center h-full">
+          <span className="text-[13px] text-muted-foreground/50">
+            Select a file from the sidebar
+          </span>
+        </div>
+      )}
       {currentState.kind === 'error' && (
         <div className="flex items-center justify-center h-full">
           <span className="text-[13px] text-destructive">{currentState.message}</span>

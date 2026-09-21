@@ -9,8 +9,8 @@ export interface DiffEditorModalProps {
   initialFilePath: string;
   /** Whether the clicked file was the staged version. Used only when initialView is omitted. */
   initialStaged: boolean;
-  /** Initial view. Defaults to working tree at HEAD/index. Pass `{kind:'commit', hash:'HEAD'}`
-   *  to open at the latest commit (the editor resolves the sentinel once commits load). */
+  /** Initial view. When set it overrides the per-repo stored view; when omitted the
+   *  editor restores the stored view, falling back to the working tree at HEAD/index. */
   initialView?: EditorView;
   activeTaskId: string | null;
   terminalTheme: XtermTheme;

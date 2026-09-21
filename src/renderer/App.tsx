@@ -1322,14 +1322,15 @@ export function App() {
                               staged: target.staged,
                             });
                           } else {
-                            // No working changes — open at the latest commit.
-                            // The 'HEAD' sentinel resolves to the real sha once
-                            // the editor loads its commit list.
+                            // No working changes — still open the working
+                            // tree, not the last commit: the editor is only
+                            // editable there, and a save shows up in this
+                            // panel as an unstaged change via the git watcher.
                             setDiffFile({
                               cwd: activeTask.path,
                               filePath: '',
                               staged: false,
-                              initialView: { kind: 'commit', hash: 'HEAD' },
+                              initialView: { kind: 'working', ref: 'HEAD' },
                             });
                           }
                         }}

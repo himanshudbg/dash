@@ -22,8 +22,8 @@ export function parseStoredView(raw: string | null): EditorView | null {
     return { kind: 'working', ref: o.ref };
   }
   if (o.kind === 'commit' && typeof o.hash === 'string' && o.hash) {
-    // Never restore the unresolved 'HEAD' sentinel as a pinned commit — the
-    // working tree is the right default for "latest".
+    // A symbolic ref isn't a pinned commit (older builds used 'HEAD' as a
+    // "latest commit" placeholder) — the working tree is the right default.
     if (o.hash === 'HEAD') return null;
     return { kind: 'commit', hash: o.hash };
   }
@@ -42,8 +42,6 @@ export function readStoredView(cwd: string): EditorView | null {
 }
 
 export function writeStoredView(cwd: string, view: EditorView): void {
-  // Don't persist the unresolved 'HEAD' sentinel; wait for the concrete sha.
-  if (view.kind === 'commit' && view.hash === 'HEAD') return;
   try {
     localStorage.setItem(keyFor(cwd), JSON.stringify(view));
   } catch {

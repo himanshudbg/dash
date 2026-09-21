@@ -64,9 +64,10 @@ export function useMonacoEditor(args: Args): Api {
 
   // Keep the most recently loaded state alive so the editor doesn't unmount
   // mid-switch. Mutating a ref during render is intentional here — `displayed`
-  // is always a recent snapshot of `state`.
+  // is always a recent snapshot of `state`. Only 'loading' is held over: an
+  // empty selection must unmount the previous file, not keep showing it.
   const lastLoadedRef = useRef<LoadState>({ kind: 'loading' });
-  if (args.state.kind === 'loaded' || args.state.kind === 'error') {
+  if (args.state.kind !== 'loading') {
     lastLoadedRef.current = args.state;
   }
   const displayed = lastLoadedRef.current;

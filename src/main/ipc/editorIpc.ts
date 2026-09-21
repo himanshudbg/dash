@@ -183,14 +183,40 @@ async function listIgnoredRepoFiles(cwd: string): Promise<string[]> {
         { cwd, maxBuffer: 50 * 1024 * 1024, timeout: 15000 },
       )
     ).stdout;
-    return out
-      .split('\0')
-      .filter(Boolean)
-      .map((p) => p.replace(/\/$/, ''))
-      .sort();
+    return parseIgnoredListingZ(out);
   } catch {
     return [];
   }
+}
+
+/**
+ * Parse `git ls-files -z --others --ignored --exclude-standard --directory`.
+ * Trailing slashes are stripped so the paths slot into the same tree builder
+ * as tracked/untracked files. Git lists a collapsed directory *and* its
+ * children when the directory holds a nested repository (every Dash project
+ * does: `.claude/worktrees/<task>/.git`), which would render `.claude` as both
+ * a file row and a folder; entries under an already-listed directory are
+ * dropped so each ignored subtree is one entry.
+ */
+export function parseIgnoredListingZ(out: string): string[] {
+  const entries = out
+    .split('\0')
+    .filter(Boolean)
+    .map((p) => p.replace(/\/$/, ''))
+    .sort();
+  // Sorted, so a directory always precedes anything under it.
+  const kept = new Set<string>();
+  for (const p of entries) {
+    let nested = false;
+    for (let i = p.indexOf('/'); i !== -1; i = p.indexOf('/', i + 1)) {
+      if (kept.has(p.slice(0, i))) {
+        nested = true;
+        break;
+      }
+    }
+    if (!nested) kept.add(p);
+  }
+  return Array.from(kept);
 }
 
 async function listCommitRepoFiles(cwd: string, hash: string): Promise<string[]> {
