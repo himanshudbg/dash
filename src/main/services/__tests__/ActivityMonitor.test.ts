@@ -300,3 +300,56 @@ describe('ActivityMonitor — supervisor reconcile (applySupervisor)', () => {
     expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
   });
 });
+
+describe('ActivityMonitor — Escape interrupt (setInterrupted)', () => {
+  const POLL = 15_000;
+
+  it('brings a running task back to idle and clears the tool', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setToolStart('t1', 'Bash', { command: 'sleep 100' });
+    activityMonitor.setInterrupted('t1');
+    const info = activityMonitor.getAll()['t1']!;
+    expect(info.state).toBe('idle');
+    expect(info.tool).toBeUndefined();
+  });
+
+  it('also cancels a pending permission prompt', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setWaitingForPermission('t1');
+    activityMonitor.setInterrupted('t1');
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+  });
+
+  it('is a no-op while idle — Escape there just closes menus', () => {
+    activityMonitor.register('t1', 1);
+    mockSender.send.mockClear();
+    activityMonitor.setInterrupted('t1');
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+    expect(mockSender.send).not.toHaveBeenCalled();
+  });
+
+  it('does not touch stopped or errored tasks', () => {
+    activityMonitor.applySupervisor('t1', { state: 'stopped', detail: 'Sleeping' }, POLL);
+    activityMonitor.setInterrupted('t1');
+    expect(activityMonitor.getAll()['t1']!.state).toBe('stopped');
+  });
+
+  // The supervisor's `status` goes stale (a `done` job has reported `busy`
+  // for hours), so the keystroke must keep hook precedence: a listing that
+  // still says busy right after the interrupt is ignored for one poll.
+  it('keeps precedence over a stale busy from the supervisor for one poll', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setBusy('t1');
+    activityMonitor.setInterrupted('t1');
+    activityMonitor.applySupervisor('t1', { state: 'busy' }, POLL);
+    expect(activityMonitor.getAll()['t1']!.state).toBe('idle');
+  });
+
+  it('lets the next hook re-establish busy as usual', () => {
+    activityMonitor.register('t1', 1);
+    activityMonitor.setBusy('t1');
+    activityMonitor.setInterrupted('t1');
+    activityMonitor.setToolStart('t1', 'Read', { file_path: '/x' });
+    expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
+  });
+});

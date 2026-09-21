@@ -627,9 +627,15 @@ export function sendRemoteControl(id: string): void {
  */
 export function writePty(id: string, data: string): void {
   const record = ptys.get(id);
-  if (record) {
-    record.proc.write(data);
+  if (!record) return;
+  // A bare Escape (one byte — arrow keys and the like arrive as CSI
+  // sequences, `\x1b[…`) on the agent pane is Claude Code's interrupt. Claude
+  // Code fires no hook for it, so this keystroke is the only instant signal
+  // that the turn is over. See ActivityMonitor.setInterrupted().
+  if (record.kind === 'agent' && record.taskId && data === '\x1b') {
+    activityMonitor.setInterrupted(record.taskId);
   }
+  record.proc?.write(data);
 }
 
 /**

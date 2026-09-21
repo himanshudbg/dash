@@ -203,6 +203,28 @@ class ActivityMonitorImpl {
     this.emitAll();
   }
 
+  /**
+   * The user pressed Escape in the agent pane. Claude Code treats that as an
+   * interrupt while a turn is running or a permission prompt is up, and — by
+   * design — does not fire the Stop hook for it, so nothing else brings the
+   * dot back from "running". The supervisor listing can't be relied on
+   * either: its `status` goes stale (a `done` job has reported `busy` for
+   * hours). So the keystroke is the signal, and like a hook it keeps
+   * precedence over the listing for one poll interval. Escape while already
+   * idle just closes menus; nothing to do.
+   */
+  setInterrupted(ptyId: string): void {
+    const a = this.activities.get(ptyId);
+    if (!a) return;
+    if (a.state !== 'busy' && a.state !== 'waiting') return;
+    a.lastHookTime = Date.now();
+    a.state = 'idle';
+    a.tool = null;
+    a.compacting = false;
+    a.detail = null;
+    this.emitAll();
+  }
+
   setToolStart(ptyId: string, toolName: string, toolInput?: Record<string, unknown>): void {
     const a = this.activities.get(ptyId);
     if (!a) return;
