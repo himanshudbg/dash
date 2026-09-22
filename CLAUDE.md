@@ -28,6 +28,7 @@ Renderer hot-reloads; main process changes require restart. Husky pre-commit run
 
 - **Tailwind CSS** for all styling; dark/light via class on root
 - **Colors**: HSL CSS custom properties only (no raw hex/rgb). Tokens: `foreground`, `muted-foreground`, `background`, `surface-0..3`, `primary`, `destructive`, `border`, `git-added/modified/deleted/renamed/untracked/conflicted`
+- **Faded text**: `text-muted-fade-N` / `text-fg-fade-N` / `fade-N`, never `text-muted-foreground/N`, `text-foreground/N` or `opacity-N` on text: they rescale the fade per theme so light stays readable. Glass edges/shadows likewise use `border-edge/N`, `shadow-shade/N`, `bg-scrim` and the `--glass-*` tokens, not white/black
 - **Icons**: lucide-react, 14px default, stroke-width 1.8
 
 ## Data Storage

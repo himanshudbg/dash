@@ -48,7 +48,7 @@ export function Segmented<T extends string | number | null>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={`relative z-10 flex items-center justify-center gap-1.5 px-3 ${pad} ${fullWidth ? 'flex-1' : ''} rounded-md font-medium transition-colors duration-150 ${
-              active ? 'text-foreground' : 'text-foreground/55 hover:text-foreground/80'
+              active ? 'text-foreground' : 'text-fg-fade-55 hover:text-fg-fade-80'
             }`}
           >
             {opt.icon}

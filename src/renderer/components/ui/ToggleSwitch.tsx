@@ -25,7 +25,7 @@ export function ToggleSwitch({
       } ${
         enabled
           ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20'
-          : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
+          : 'border-border/60 text-fg-fade-60 hover:bg-accent/40 hover:text-foreground'
       }`}
     >
       <Switch enabled={enabled} onToggle={onToggle} disabled={disabled} />

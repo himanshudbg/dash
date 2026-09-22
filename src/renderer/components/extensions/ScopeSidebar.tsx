@@ -56,7 +56,7 @@ export function ScopeSidebar({
         {chevron ? (
           <button
             onClick={chevron.onToggle}
-            className="shrink-0 py-1.5 pl-1.5 pr-0.5 text-foreground/35 hover:text-foreground/70"
+            className="shrink-0 py-1.5 pl-1.5 pr-0.5 text-fg-fade-35 hover:text-fg-fade-70"
             aria-label={chevron.open ? 'Collapse' : 'Expand'}
           >
             <ChevronRight
@@ -72,10 +72,10 @@ export function ScopeSidebar({
         <button
           onClick={() => onSelect(id)}
           className={`flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-[12.5px] transition-colors duration-150 ${
-            active ? 'text-foreground' : 'text-foreground/60 group-hover:text-foreground'
+            active ? 'text-foreground' : 'text-fg-fade-60 group-hover:text-foreground'
           }`}
         >
-          <span className={active ? 'text-foreground/80' : 'text-foreground/40'}>{icon}</span>
+          <span className={active ? 'text-fg-fade-80' : 'text-fg-fade-40'}>{icon}</span>
           <span className="truncate">{label}</span>
           {count > 0 && <CountBadge count={count} className="ml-auto" />}
         </button>
@@ -86,7 +86,7 @@ export function ScopeSidebar({
   return (
     <div className="w-[262px] shrink-0 space-y-0.5 overflow-y-auto border-r border-border/40 p-2">
       {loading && (
-        <div className="flex justify-center p-4 text-foreground/40">
+        <div className="flex justify-center p-4 text-fg-fade-40">
           <Loader2 size={16} className="animate-spin" />
         </div>
       )}

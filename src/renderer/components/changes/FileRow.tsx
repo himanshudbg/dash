@@ -34,7 +34,7 @@ const STATUS_CLASS: Record<FileChangeStatus, string> = {
   renamed: 'text-[hsl(var(--git-renamed))]',
   untracked: 'text-[hsl(var(--git-untracked))]',
   conflicted: 'text-[hsl(var(--git-conflicted))]',
-  ignored: 'text-muted-foreground/40',
+  ignored: 'text-muted-fade-40',
 };
 
 function basename(p: string): string {

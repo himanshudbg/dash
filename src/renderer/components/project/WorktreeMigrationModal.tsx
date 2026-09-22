@@ -117,7 +117,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
         <button
           onClick={close}
           disabled={busy}
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -128,7 +128,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
           <>
             <p className="text-[12.5px] text-muted-foreground leading-relaxed">
               Dash now keeps each task&apos;s worktree inside its project at{' '}
-              <code className="px-1 py-0.5 rounded bg-accent/80 text-[10.5px] font-mono text-foreground/75">
+              <code className="px-1 py-0.5 rounded bg-accent/80 text-[10.5px] font-mono text-fg-fade-75">
                 .claude/worktrees/
               </code>
               , where Claude Code expects it. {taskCount} worktree{taskCount === 1 ? '' : 's'} in{' '}
@@ -159,24 +159,24 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                     <span className="text-[12.5px] font-medium text-foreground truncate">
                       {project.projectName}
                     </span>
-                    <span className="text-[11px] text-muted-foreground/70 ml-auto shrink-0">
+                    <span className="text-[11px] text-muted-fade-70 ml-auto shrink-0">
                       {project.tasks.length} task{project.tasks.length === 1 ? '' : 's'}
                     </span>
                   </label>
-                  <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-[10.5px] font-mono text-foreground/50">
-                    <dt className="text-muted-foreground/60 select-none">from</dt>
+                  <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-[10.5px] font-mono text-fg-fade-50">
+                    <dt className="text-muted-fade-60 select-none">from</dt>
                     <dd className="break-all">{project.legacyDir}</dd>
-                    <dt className="text-muted-foreground/60 select-none">to</dt>
+                    <dt className="text-muted-fade-60 select-none">to</dt>
                     <dd className="break-all">{project.targetDir}</dd>
                   </dl>
                   <ul className="mt-2 space-y-1">
                     {project.tasks.map((t) => (
                       <li
                         key={t.taskId}
-                        className="flex items-center gap-2 text-[11.5px] text-foreground/80 min-w-0"
+                        className="flex items-center gap-2 text-[11.5px] text-fg-fade-80 min-w-0"
                       >
                         <span className="truncate">{t.taskName}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground/60 truncate">
+                        <span className="font-mono text-[10px] text-muted-fade-60 truncate">
                           {t.branch}
                         </span>
                         {t.archived && (
@@ -244,7 +244,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                     className="rounded-lg border border-border/40 px-3 py-2 text-[11.5px]"
                   >
                     <span className="font-medium text-foreground">{f.taskName}</span>
-                    <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10.5px] text-foreground/60">
+                    <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10.5px] text-fg-fade-60">
                       {f.error}
                     </pre>
                   </li>
@@ -296,7 +296,7 @@ function WorktreeMigrationBody({ plan, onMigrated }: Omit<WorktreeMigrationModal
                 type="button"
                 onClick={handleLater}
                 disabled={busy}
-                className="px-4 py-2 rounded-full text-[13px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+                className="px-4 py-2 rounded-full text-[13px] text-muted-fade-60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
               >
                 Later
               </button>

@@ -53,7 +53,7 @@ export function CommitDetailPanel({
       <div className="flex flex-col flex-1 min-w-[340px] min-h-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 h-10 border-b border-border/60 shrink-0">
-          <span className="text-[11px] font-semibold uppercase text-foreground/80 tracking-[0.08em]">
+          <span className="text-[11px] font-semibold uppercase text-fg-fade-80 tracking-[0.08em]">
             Details
           </span>
           <button
@@ -81,7 +81,7 @@ export function CommitDetailPanel({
 
               {/* Body */}
               {detail.body && (
-                <p className="text-[12px] text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                <p className="text-[12px] text-fg-fade-80 leading-relaxed whitespace-pre-wrap">
                   {detail.body}
                 </p>
               )}
@@ -93,7 +93,7 @@ export function CommitDetailPanel({
                   {githubSlug ? (
                     <a
                       href={`https://github.com/${githubSlug}/commit/${detail.commit.hash}`}
-                      className="font-mono text-foreground/80 hover:underline cursor-pointer"
+                      className="font-mono text-fg-fade-80 hover:underline cursor-pointer"
                       onClick={(e) => {
                         e.preventDefault();
                         void window.electronAPI.openExternal(
@@ -104,7 +104,7 @@ export function CommitDetailPanel({
                       {detail.commit.hash.slice(0, 12)}
                     </a>
                   ) : (
-                    <span className="font-mono text-foreground/80">
+                    <span className="font-mono text-fg-fade-80">
                       {detail.commit.hash.slice(0, 12)}
                     </span>
                   )}
@@ -167,7 +167,7 @@ export function CommitDetailPanel({
                   {detail.commit.refs.map((ref) => (
                     <span
                       key={ref.name}
-                      className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-semibold bg-accent text-foreground/90"
+                      className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-semibold bg-accent text-fg-fade-90"
                     >
                       {ref.name}
                     </span>

@@ -11,10 +11,10 @@ interface ConfigureFormProps {
 }
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150';
-const labelClass = 'block text-[12px] font-medium text-muted-foreground/70 mb-2';
+  'w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-fade-30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150';
+const labelClass = 'block text-[12px] font-medium text-muted-fade-70 mb-2';
 const sectionLabel =
-  'block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50 mb-2';
+  'block text-[10px] font-semibold uppercase tracking-wide text-muted-fade-50 mb-2';
 
 export function ConfigureForm({ value, onChange, showName = true }: ConfigureFormProps) {
   const set = <K extends keyof ConfigureValues>(key: K, v: ConfigureValues[K]) =>
@@ -62,7 +62,7 @@ export function ConfigureForm({ value, onChange, showName = true }: ConfigureFor
             </select>
           </div>
         </div>
-        <label className="flex items-center gap-2 mt-3 text-[13px] text-foreground/90 cursor-pointer">
+        <label className="flex items-center gap-2 mt-3 text-[13px] text-fg-fade-90 cursor-pointer">
           <input
             type="checkbox"
             checked={value.useWorktree}
@@ -112,11 +112,11 @@ export function ConfigureForm({ value, onChange, showName = true }: ConfigureFor
             />
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground/60 mt-2 leading-relaxed">
+        <p className="text-[11px] text-muted-fade-60 mt-2 leading-relaxed">
           Env vars exposed to scripts:{' '}
-          <code className="font-mono text-foreground/80">DASH_WORKTREE_PATH</code>,{' '}
-          <code className="font-mono text-foreground/80">DASH_PROJECT_PATH</code>,{' '}
-          <code className="font-mono text-foreground/80">DASH_BRANCH</code>.
+          <code className="font-mono text-fg-fade-80">DASH_WORKTREE_PATH</code>,{' '}
+          <code className="font-mono text-fg-fade-80">DASH_PROJECT_PATH</code>,{' '}
+          <code className="font-mono text-fg-fade-80">DASH_BRANCH</code>.
         </p>
       </div>
     </div>

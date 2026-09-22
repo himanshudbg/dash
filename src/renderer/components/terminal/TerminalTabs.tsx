@@ -402,7 +402,7 @@ export function TerminalTabs({
         : isActive
           ? 'bg-[hsl(var(--terminal-service)/0.16)] text-foreground'
           : tab.kind === 'service'
-            ? 'bg-[hsl(var(--terminal-service)/0.06)] text-foreground/60 hover:text-foreground hover:bg-[hsl(var(--terminal-service)/0.11)]'
+            ? 'bg-[hsl(var(--terminal-service)/0.06)] text-fg-fade-60 hover:text-foreground hover:bg-[hsl(var(--terminal-service)/0.11)]'
             : 'text-muted-foreground hover:text-foreground';
     const closeable = tabs.length > 1;
     const showDot = isHotTui || (tab.kind !== 'tui' && livePtyIds.has(tab.id));
@@ -473,7 +473,7 @@ export function TerminalTabs({
           className={`h-full w-full flex items-center gap-2 px-4 transition-colors border-t border-edge/8 ${
             hasUnseenTui
               ? 'bg-primary/10 text-primary hover:bg-primary/15'
-              : 'text-foreground/80 hover:text-foreground hover:bg-edge/4'
+              : 'text-fg-fade-80 hover:text-foreground hover:bg-edge/4'
           }`}
         >
           <Terminal size={12} strokeWidth={1.8} />

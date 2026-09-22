@@ -14,8 +14,8 @@ interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElem
 }
 
 const variantStyles = {
-  default: 'hover:bg-accent text-foreground/80 hover:text-foreground',
-  destructive: 'hover:bg-destructive/15 text-foreground/80 hover:text-destructive',
+  default: 'hover:bg-accent text-fg-fade-80 hover:text-foreground',
+  destructive: 'hover:bg-destructive/15 text-fg-fade-80 hover:text-destructive',
   /** Header-strip style: muted at rest, like the header's other ghost buttons. */
   muted: 'text-muted-foreground hover:text-foreground hover:bg-foreground/5',
 } as const;

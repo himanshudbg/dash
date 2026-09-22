@@ -16,7 +16,7 @@ const DESCRIPTIONS: Record<PermissionMode, string> = {
 };
 
 function ModeIcon({ mode }: { mode: PermissionMode }) {
-  const props = { size: 13, strokeWidth: 1.8, className: 'text-muted-foreground/60' };
+  const props = { size: 13, strokeWidth: 1.8, className: 'text-muted-fade-60' };
   if (mode === 'acceptEdits') return <Zap {...props} />;
   if (mode === 'bypassPermissions') return <Flame {...props} />;
   return <Shield {...props} />;
@@ -34,9 +34,7 @@ export function PermissionModePicker({
 }) {
   return (
     <div>
-      <label className="block text-[12px] font-medium text-foreground/70 mb-2">
-        Permission mode
-      </label>
+      <label className="block text-[12px] font-medium text-fg-fade-70 mb-2">Permission mode</label>
       <Select<PermissionMode>
         value={value}
         onValueChange={onChange}
@@ -48,8 +46,8 @@ export function PermissionModePicker({
           </span>
         )}
       />
-      <p className="mt-1.5 text-[11px] text-muted-foreground/50">{DESCRIPTIONS[value]}</p>
-      {helperText && <p className="mt-0.5 text-[11px] text-muted-foreground/40">{helperText}</p>}
+      <p className="mt-1.5 text-[11px] text-muted-fade-50">{DESCRIPTIONS[value]}</p>
+      {helperText && <p className="mt-0.5 text-[11px] text-muted-fade-40">{helperText}</p>}
     </div>
   );
 }

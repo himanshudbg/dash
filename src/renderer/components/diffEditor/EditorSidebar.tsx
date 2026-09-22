@@ -206,7 +206,7 @@ const STATUS_TEXT: Record<FileChangeStatus, string> = {
   untracked: 'text-[hsl(var(--git-untracked))]',
   conflicted: 'text-[hsl(var(--git-conflicted))]',
   // No dedicated token — ignored files are intentionally low-emphasis (muted).
-  ignored: 'text-muted-foreground/40',
+  ignored: 'text-muted-fade-40',
 };
 
 const FOLDER_TINT: Record<FileChangeStatus, string> = {
@@ -218,7 +218,7 @@ const FOLDER_TINT: Record<FileChangeStatus, string> = {
   conflicted: 'text-[hsl(var(--git-conflicted)/0.85)]',
   // Never used for folder tint (ignored is absent from STATUS_PRIORITY, so
   // pickDominant won't select it) — present only to satisfy the record type.
-  ignored: 'text-muted-foreground/40',
+  ignored: 'text-muted-fade-40',
 };
 
 interface FileTreePanelProps {
@@ -293,7 +293,7 @@ function FileTreePanel({
   }, [changedFiles]);
   return (
     <div className="h-full min-h-0 flex flex-col">
-      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-mono flex items-center justify-between shrink-0">
+      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-fade-70 font-mono flex items-center justify-between shrink-0">
         <span className="flex items-center gap-2">
           <span>
             Files{' '}
@@ -321,7 +321,7 @@ function FileTreePanel({
               className={`shrink-0 p-1 -mr-1 rounded transition-colors ${
                 changedOnly
                   ? 'text-primary'
-                  : 'text-muted-foreground/50 hover:text-foreground hover:bg-[hsl(var(--surface-2)/0.6)]'
+                  : 'text-muted-fade-50 hover:text-foreground hover:bg-[hsl(var(--surface-2)/0.6)]'
               }`}
             >
               <ListFilter size={13} strokeWidth={1.8} />
@@ -331,9 +331,9 @@ function FileTreePanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable scrollbar-thin-hover pb-2 px-1">
         {loading && paths.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground/40">Loading…</div>
+          <div className="px-3 py-2 text-[11px] text-muted-fade-40">Loading…</div>
         ) : changedOnly && tree.changedCount === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground/40">No changed files</div>
+          <div className="px-3 py-2 text-[11px] text-muted-fade-40">No changed files</div>
         ) : (
           <FolderContents
             node={tree}
@@ -429,7 +429,7 @@ function FolderEntry({
       setOpen(true);
     }
   }, [folder.changedCount]);
-  const tint = folder.dominantStatus ? FOLDER_TINT[folder.dominantStatus] : 'text-foreground/90';
+  const tint = folder.dominantStatus ? FOLDER_TINT[folder.dominantStatus] : 'text-fg-fade-90';
   return (
     <>
       <button
@@ -443,21 +443,19 @@ function FolderEntry({
           style={{ width: ICON_SLOT }}
         >
           {open ? (
-            <ChevronDown size={11} strokeWidth={1.8} className="text-muted-foreground/55" />
+            <ChevronDown size={11} strokeWidth={1.8} className="text-muted-fade-55" />
           ) : (
-            <ChevronRight size={11} strokeWidth={1.8} className="text-muted-foreground/55" />
+            <ChevronRight size={11} strokeWidth={1.8} className="text-muted-fade-55" />
           )}
         </span>
         <span className={`flex-1 min-w-0 font-mono text-[11.5px] truncate text-left ${tint}`}>
           {folder.name}
-          <span className="text-muted-foreground/40">/</span>
+          <span className="text-muted-fade-40">/</span>
         </span>
         {folder.changedCount > 0 && (
           <span
             className={`shrink-0 font-mono text-[10px] font-semibold tabular-nums ${
-              folder.dominantStatus
-                ? STATUS_TEXT[folder.dominantStatus]
-                : 'text-muted-foreground/70'
+              folder.dominantStatus ? STATUS_TEXT[folder.dominantStatus] : 'text-muted-fade-70'
             }`}
             aria-label={`${folder.changedCount} changed`}
           >
@@ -506,11 +504,7 @@ function FileEntry({
   onClick: () => void;
 }) {
   const change = file.change;
-  const tint = selected
-    ? 'text-primary'
-    : change
-      ? STATUS_TEXT[change.status]
-      : 'text-foreground/80';
+  const tint = selected ? 'text-primary' : change ? STATUS_TEXT[change.status] : 'text-fg-fade-80';
   return (
     <button
       type="button"
@@ -589,7 +583,7 @@ function CommitsDrawer({
 
   return (
     <div className="h-full min-h-0 flex flex-col">
-      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-mono flex items-center gap-1.5 shrink-0">
+      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-fade-70 font-mono flex items-center gap-1.5 shrink-0">
         <History size={11} strokeWidth={1.8} />
         <span>Commits</span>
         {commits.length > 0 && <span className="ml-auto tabular-nums">{commits.length}</span>}
@@ -607,7 +601,7 @@ function CommitsDrawer({
           className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-left transition-colors ${
             workingActive
               ? 'bg-primary/15 text-primary'
-              : 'text-foreground/85 hover:bg-[hsl(var(--surface-2)/0.6)]'
+              : 'text-fg-fade-85 hover:bg-[hsl(var(--surface-2)/0.6)]'
           }`}
         >
           <GitCommit size={11} strokeWidth={1.8} className="opacity-60 shrink-0" />
@@ -617,7 +611,7 @@ function CommitsDrawer({
           )}
         </button>
         {loading && commits.length === 0 && (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground/40">Loading…</div>
+          <div className="px-3 py-2 text-[11px] text-muted-fade-40">Loading…</div>
         )}
         {commits.map((c) => {
           const active = activeCommitHash === c.hash;
@@ -685,10 +679,10 @@ function CommitRow({ commit, active, commentCount, onSelect }: CommitRowProps) {
           className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-left transition-colors ${
             active
               ? 'bg-primary/15 text-primary'
-              : 'text-foreground/85 hover:bg-[hsl(var(--surface-2)/0.6)]'
+              : 'text-fg-fade-85 hover:bg-[hsl(var(--surface-2)/0.6)]'
           }`}
         >
-          <span className="text-[10px] font-mono text-muted-foreground/60 tabular-nums shrink-0">
+          <span className="text-[10px] font-mono text-muted-fade-60 tabular-nums shrink-0">
             {commit.shortHash}
           </span>
           <span className="truncate flex-1 font-mono text-[11.5px]">
@@ -705,7 +699,7 @@ function CommitRow({ commit, active, commentCount, onSelect }: CommitRowProps) {
               )}
             </span>
           )}
-          <span className="text-[10px] text-muted-foreground/40 shrink-0 tabular-nums">
+          <span className="text-[10px] text-muted-fade-40 shrink-0 tabular-nums">
             {formatRelativeTime(commit.authorDate, Date.now() / 1000)}
           </span>
         </button>
@@ -733,11 +727,11 @@ function CommitRow({ commit, active, commentCount, onSelect }: CommitRowProps) {
           {commit.subject || '(no subject)'}
         </div>
         {commit.body && (
-          <div className="text-[11.5px] text-foreground/75 leading-relaxed whitespace-pre-wrap font-mono">
+          <div className="text-[11.5px] text-fg-fade-75 leading-relaxed whitespace-pre-wrap font-mono">
             {commit.body}
           </div>
         )}
-        <div className="flex items-center gap-2 pt-1.5 border-t border-border/40 text-[10.5px] text-muted-foreground/75">
+        <div className="flex items-center gap-2 pt-1.5 border-t border-border/40 text-[10.5px] text-muted-fade-75">
           <span className="font-mono tabular-nums">{commit.shortHash}</span>
           <span className="opacity-50">·</span>
           <span className="truncate">{commit.authorName}</span>

@@ -137,9 +137,7 @@ export function TaskCard({
           <Globe size={10} strokeWidth={2} className="text-primary shrink-0 -ml-0.5" />
         )}
 
-        <span
-          className={`truncate flex-1 min-w-0 ${!isActive && !activityState ? 'opacity-50' : ''}`}
-        >
+        <span className={`truncate flex-1 min-w-0 ${!isActive && !activityState ? 'fade-50' : ''}`}>
           {task.name}
         </span>
 

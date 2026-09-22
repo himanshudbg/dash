@@ -142,9 +142,9 @@ export function SearchableMultiSelect<T>({
       <div className="relative" ref={dropdownRef}>
         <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-background border border-input/60 focus-within:ring-2 focus-within:ring-ring/30 focus-within:border-ring/50 transition-all duration-150">
           {loading ? (
-            <Loader2 size={12} className="animate-spin text-muted-foreground/50 shrink-0" />
+            <Loader2 size={12} className="animate-spin text-muted-fade-50 shrink-0" />
           ) : (
-            <Search size={12} className="text-muted-foreground/40 shrink-0" />
+            <Search size={12} className="text-muted-fade-40 shrink-0" />
           )}
           <input
             ref={searchInputRef}
@@ -160,7 +160,7 @@ export function SearchableMultiSelect<T>({
               void fetchRecent();
             }}
             placeholder={placeholder}
-            className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/30 outline-hidden"
+            className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-fade-30 outline-hidden"
           />
         </div>
 
@@ -168,7 +168,7 @@ export function SearchableMultiSelect<T>({
           <div className="absolute z-50 mt-1 w-full bg-card border border-border/60 rounded-lg shadow-xl shadow-shade/30 overflow-hidden">
             <div className="max-h-[200px] overflow-y-auto">
               {loading && results.length === 0 ? (
-                <div className="px-3 py-3 text-[12px] text-muted-foreground/40 text-center flex items-center justify-center gap-2">
+                <div className="px-3 py-3 text-[12px] text-muted-fade-40 text-center flex items-center justify-center gap-2">
                   <Loader2 size={12} className="animate-spin" />
                   Searching...
                 </div>
@@ -177,7 +177,7 @@ export function SearchableMultiSelect<T>({
                   {error}
                 </div>
               ) : results.length === 0 ? (
-                <div className="px-3 py-3 text-[12px] text-muted-foreground/40 text-center">
+                <div className="px-3 py-3 text-[12px] text-muted-fade-40 text-center">
                   No results found
                 </div>
               ) : (

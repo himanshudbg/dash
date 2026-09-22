@@ -203,7 +203,7 @@ export function CommitGraphView({
                     void handleLoadMore();
                   }}
                   disabled={loadingMore}
-                  className="px-4 py-1.5 rounded-md text-[11px] font-medium bg-accent hover:bg-accent/80 text-foreground/80 hover:text-foreground transition-colors disabled:opacity-40"
+                  className="px-4 py-1.5 rounded-md text-[11px] font-medium bg-accent hover:bg-accent/80 text-fg-fade-80 hover:text-foreground transition-colors disabled:opacity-40"
                 >
                   {loadingMore
                     ? 'Loading...'

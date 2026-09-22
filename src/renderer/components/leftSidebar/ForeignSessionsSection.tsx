@@ -100,7 +100,7 @@ export function ForeignSessionsSection({ project, onSelectTask }: ForeignSession
               return (
                 <div
                   key={key}
-                  className="group/foreign grid grid-cols-[14px_minmax(0,1fr)] -ml-2 pl-2 pr-2 py-[3px] rounded-md text-[13px] text-muted-foreground/70 sidebar-row-hover"
+                  className="group/foreign grid grid-cols-[14px_minmax(0,1fr)] -ml-2 pl-2 pr-2 py-[3px] rounded-md text-[13px] text-muted-fade-70 sidebar-row-hover"
                 >
                   <div className="row-start-1 col-start-1 self-center pt-[3px]">
                     <Tooltip content={dot.label}>
@@ -111,7 +111,7 @@ export function ForeignSessionsSection({ project, onSelectTask }: ForeignSession
                     <Tooltip content={row.cwd}>
                       <span className="truncate flex-1 min-w-0">{label}</span>
                     </Tooltip>
-                    <span className="text-[10.5px] text-muted-foreground/50 shrink-0 group-hover/foreign:hidden">
+                    <span className="text-[10.5px] text-muted-fade-50 shrink-0 group-hover/foreign:hidden">
                       {row.id ? row.id : 'interactive'}
                       {row.startedAt
                         ? ` · ${formatRelativeTime(Math.floor(row.startedAt / 1000), Math.floor(Date.now() / 1000))}`
@@ -131,7 +131,7 @@ export function ForeignSessionsSection({ project, onSelectTask }: ForeignSession
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="rounded-md p-0.5 transition-colors duration-150 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-40"
+                              className="rounded-md p-0.5 transition-colors duration-150 hover:bg-accent text-fg-fade-80 hover:text-foreground disabled:opacity-40"
                               aria-label="Session actions"
                               disabled={isBusy}
                             >

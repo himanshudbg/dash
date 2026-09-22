@@ -27,7 +27,7 @@ export function TokenBadge({ totalTokens, totalCostUsd, size = 'md' }: TokenBadg
         <span>{formatTokens(totalTokens)}</span>
         {showCost && (
           <>
-            <span className="text-foreground/30">·</span>
+            <span className="text-fg-fade-30">·</span>
             <span>{formatCost(totalCostUsd)}</span>
           </>
         )}

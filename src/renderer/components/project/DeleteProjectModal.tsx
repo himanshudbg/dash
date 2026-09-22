@@ -113,7 +113,7 @@ function DeleteProjectBody({ project, tasks, onConfirm }: DeleteProjectBodyProps
         <button
           onClick={close}
           disabled={isDeleting}
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -134,7 +134,7 @@ function DeleteProjectBody({ project, tasks, onConfirm }: DeleteProjectBodyProps
                 label={
                   <>
                     Delete worktree directories{' '}
-                    <span className="text-muted-foreground/50 font-normal">
+                    <span className="text-muted-fade-50 font-normal">
                       ({worktreeTasks.length} worktree
                       {worktreeTasks.length !== 1 ? 's' : ''})
                     </span>
@@ -149,7 +149,7 @@ function DeleteProjectBody({ project, tasks, onConfirm }: DeleteProjectBodyProps
                 label={
                   <>
                     Delete local branches{' '}
-                    <span className="text-muted-foreground/50 font-normal">
+                    <span className="text-muted-fade-50 font-normal">
                       ({branchTasks.length} branch
                       {branchTasks.length !== 1 ? 'es' : ''})
                     </span>
@@ -164,7 +164,7 @@ function DeleteProjectBody({ project, tasks, onConfirm }: DeleteProjectBodyProps
                 label={
                   <>
                     Delete remote branches{' '}
-                    <span className="text-muted-foreground/50 font-normal">
+                    <span className="text-muted-fade-50 font-normal">
                       ({remoteBranchTasks.length} remote branch
                       {remoteBranchTasks.length !== 1 ? 'es' : ''})
                     </span>
@@ -180,7 +180,7 @@ function DeleteProjectBody({ project, tasks, onConfirm }: DeleteProjectBodyProps
             type="button"
             onClick={close}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-full text-[13px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+            className="px-4 py-2 rounded-full text-[13px] text-muted-fade-60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
           >
             Cancel
           </button>

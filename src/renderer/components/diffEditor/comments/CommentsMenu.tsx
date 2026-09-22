@@ -146,7 +146,7 @@ export function CommentsMenu({
         <button
           className={`group/trigger flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-full text-[11px] font-medium border backdrop-blur-md transition-all duration-200 ease-out ${
             noUnsent
-              ? 'border-border/40 bg-foreground/2.5 text-muted-foreground/80 hover:bg-foreground/6 hover:border-border/55 hover:text-foreground/90'
+              ? 'border-border/40 bg-foreground/2.5 text-muted-fade-80 hover:bg-foreground/6 hover:border-border/55 hover:text-fg-fade-90'
               : 'border-primary/30 bg-primary/9 text-primary hover:bg-primary/[0.14] hover:border-primary/45'
           }`}
           style={{ boxShadow: noUnsent ? undefined : 'inset 0 1px 0 hsl(0 0% 100% / 0.06)' }}
@@ -179,8 +179,8 @@ export function CommentsMenu({
         className="glass-popover w-[460px] max-h-[520px] flex flex-col p-0 overflow-hidden"
       >
         <div className="flex items-baseline justify-between px-4 pt-3 pb-2.5 border-b border-foreground/6 shrink-0">
-          <h3 className="text-[12px] font-semibold tracking-tight text-foreground/90">Comments</h3>
-          <span className="text-[10.5px] text-muted-foreground/60 tabular-nums tracking-tight">
+          <h3 className="text-[12px] font-semibold tracking-tight text-fg-fade-90">Comments</h3>
+          <span className="text-[10.5px] text-muted-fade-60 tabular-nums tracking-tight">
             {totalUnsent + totalSent} total
           </span>
         </div>
@@ -205,19 +205,19 @@ export function CommentsMenu({
             />
           )}
           {noUnsent && totalSent === 0 && (
-            <div className="px-4 py-6 text-center text-[11px] italic text-muted-foreground/55">
+            <div className="px-4 py-6 text-center text-[11px] italic text-muted-fade-55">
               No comments yet.
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-foreground/6 bg-foreground/2 shrink-0">
-          <span className="text-[10.5px] text-muted-foreground/65 leading-tight">
+          <span className="text-[10.5px] text-muted-fade-65 leading-tight">
             {noUnsent ? (
               <>All caught up</>
             ) : (
               <>
-                <span className="font-medium text-foreground/85 tabular-nums">{totalUnsent}</span>{' '}
+                <span className="font-medium text-fg-fade-85 tabular-nums">{totalUnsent}</span>{' '}
                 across {unsentViews.length} view{unsentViews.length !== 1 ? 's' : ''}
               </>
             )}
@@ -231,7 +231,7 @@ export function CommentsMenu({
                 onEditAndSend();
               }}
               title="Edit the assembled prompt before sending"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-muted-foreground/80 hover:text-foreground hover:bg-foreground/6 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-muted-fade-80 hover:text-foreground hover:bg-foreground/6 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               <Pencil size={11} strokeWidth={2.2} />
               <span>Edit</span>
@@ -297,23 +297,15 @@ function UnsentSection({
             className="flex items-center gap-2 flex-1 min-w-0 text-left"
           >
             {open ? (
-              <ChevronDown
-                size={12}
-                strokeWidth={2}
-                className="text-muted-foreground/70 shrink-0"
-              />
+              <ChevronDown size={12} strokeWidth={2} className="text-muted-fade-70 shrink-0" />
             ) : (
-              <ChevronRight
-                size={12}
-                strokeWidth={2}
-                className="text-muted-foreground/70 shrink-0"
-              />
+              <ChevronRight size={12} strokeWidth={2} className="text-muted-fade-70 shrink-0" />
             )}
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${view.isCurrent ? 'bg-primary/80' : 'bg-primary/50'}`}
               aria-hidden
             />
-            <span className="text-[11px] font-semibold tracking-tight text-foreground/90 truncate">
+            <span className="text-[11px] font-semibold tracking-tight text-fg-fade-90 truncate">
               {view.label}
             </span>
             {view.isCurrent && (
@@ -321,7 +313,7 @@ function UnsentSection({
                 current
               </span>
             )}
-            <span className="text-[10.5px] text-muted-foreground/60 tabular-nums shrink-0">
+            <span className="text-[10.5px] text-muted-fade-60 tabular-nums shrink-0">
               {view.count} to send
             </span>
           </button>
@@ -386,32 +378,24 @@ function SentSection({
             className="flex items-center gap-2 flex-1 min-w-0 text-left"
           >
             {open ? (
-              <ChevronDown
-                size={12}
-                strokeWidth={2}
-                className="text-muted-foreground/70 shrink-0"
-              />
+              <ChevronDown size={12} strokeWidth={2} className="text-muted-fade-70 shrink-0" />
             ) : (
-              <ChevronRight
-                size={12}
-                strokeWidth={2}
-                className="text-muted-foreground/70 shrink-0"
-              />
+              <ChevronRight size={12} strokeWidth={2} className="text-muted-fade-70 shrink-0" />
             )}
             <span
               className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0"
               aria-hidden
             />
-            <span className="text-[11px] font-semibold tracking-tight text-muted-foreground/85">
+            <span className="text-[11px] font-semibold tracking-tight text-muted-fade-85">
               Sent
             </span>
-            <span className="text-[10.5px] text-muted-foreground/60 tabular-nums">{total}</span>
+            <span className="text-[10.5px] text-muted-fade-60 tabular-nums">{total}</span>
           </button>
           <button
             type="button"
             onClick={() => onClearSent()}
             title={`Clear ${total} sent comment${total !== 1 ? 's' : ''}`}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-medium text-muted-foreground/65 hover:text-destructive hover:bg-destructive/10 active:scale-[0.98] transition"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-medium text-muted-fade-65 hover:text-destructive hover:bg-destructive/10 active:scale-[0.98] transition"
           >
             <Trash2 size={10} strokeWidth={2.2} />
             Clear
@@ -422,16 +406,16 @@ function SentSection({
         {views.map((v) => (
           <div key={v.scope} className="mt-1 first:mt-0">
             <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
-              <span className="text-[9px] uppercase tracking-wider font-medium text-muted-foreground/50">
+              <span className="text-[9px] uppercase tracking-wider font-medium text-muted-fade-50">
                 {v.label}
               </span>
-              <span className="text-[9px] text-muted-foreground/40 tabular-nums">{v.count}</span>
+              <span className="text-[9px] text-muted-fade-40 tabular-nums">{v.count}</span>
               {views.length > 1 && (
                 <button
                   type="button"
                   onClick={() => onClearSent(v.scope)}
                   title={`Clear ${v.count} sent comment${v.count !== 1 ? 's' : ''} in ${v.label}`}
-                  className="ml-auto shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-medium text-muted-foreground/55 hover:text-destructive hover:bg-destructive/10 transition"
+                  className="ml-auto shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-medium text-muted-fade-55 hover:text-destructive hover:bg-destructive/10 transition"
                 >
                   <Trash2 size={9} strokeWidth={2.2} />
                   Clear
@@ -506,8 +490,8 @@ function FileGroup({
     <div className={marginTop ? 'mt-2' : ''}>
       <div className="flex items-baseline gap-2 px-2 py-1">
         <span className="font-mono text-[10.5px] truncate">
-          {dir && <span className="text-muted-foreground/45">{dir}</span>}
-          <span className="text-foreground/80">{base}</span>
+          {dir && <span className="text-muted-fade-45">{dir}</span>}
+          <span className="text-fg-fade-80">{base}</span>
         </span>
         {isCurrent && (
           <span className="shrink-0 text-[9px] uppercase tracking-wider font-medium text-primary/75">
@@ -547,12 +531,12 @@ function FileGroup({
                   title="Jump to this comment"
                   className="flex-1 min-w-0 flex flex-col gap-1 px-2.5 py-1.5 pr-14 text-left rounded-md"
                 >
-                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70 shrink-0">
+                  <span className="font-mono text-[10px] tabular-nums text-muted-fade-70 shrink-0">
                     {lineLabel}
                   </span>
                   <span
                     className={`text-[12.5px] leading-snug whitespace-pre-wrap wrap-break-word ${
-                      c.sent ? 'text-foreground/55' : 'text-foreground/90'
+                      c.sent ? 'text-fg-fade-55' : 'text-fg-fade-90'
                     }`}
                   >
                     {c.text}
@@ -606,8 +590,8 @@ function ActionButton({
 }) {
   const toneClass =
     tone === 'primary'
-      ? 'text-muted-foreground/65 hover:text-primary hover:bg-primary/10'
-      : 'text-muted-foreground/55 hover:text-destructive hover:bg-destructive/10';
+      ? 'text-muted-fade-65 hover:text-primary hover:bg-primary/10'
+      : 'text-muted-fade-55 hover:text-destructive hover:bg-destructive/10';
   return (
     <button
       type="button"

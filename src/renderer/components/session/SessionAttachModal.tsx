@@ -45,14 +45,14 @@ function SessionAttachBody({
       <div className="flex items-center justify-between gap-3 px-5 h-12 border-b border-border/40 shrink-0">
         <div className="min-w-0 flex items-baseline gap-2">
           <h2 className="text-[14px] font-semibold text-foreground truncate">{label}</h2>
-          <span className="text-[11px] font-mono text-muted-foreground/60 truncate">
+          <span className="text-[11px] font-mono text-muted-fade-60 truncate">
             {session.id} · {session.cwd}
           </span>
         </div>
         <button
           onClick={close}
           title="Detach and close"
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all duration-150 shrink-0"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all duration-150 shrink-0"
         >
           <X size={14} strokeWidth={2} />
         </button>

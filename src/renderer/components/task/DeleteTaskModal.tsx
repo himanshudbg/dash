@@ -71,7 +71,7 @@ function DeleteTaskBody({ task, onConfirm }: DeleteTaskBodyProps) {
         <button
           onClick={close}
           disabled={isDeleting}
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -91,7 +91,7 @@ function DeleteTaskBody({ task, onConfirm }: DeleteTaskBodyProps) {
               label={
                 <>
                   Delete worktree directory{' '}
-                  <span className="text-muted-foreground/50 font-normal">
+                  <span className="text-muted-fade-50 font-normal">
                     {task.path.split(/[\\/]/).slice(-3).join('/')}
                   </span>
                 </>
@@ -103,7 +103,7 @@ function DeleteTaskBody({ task, onConfirm }: DeleteTaskBodyProps) {
               label={
                 <>
                   Delete local branch{' '}
-                  <span className="text-muted-foreground/50 font-normal">{task.branch}</span>
+                  <span className="text-muted-fade-50 font-normal">{task.branch}</span>
                 </>
               }
             />
@@ -114,9 +114,7 @@ function DeleteTaskBody({ task, onConfirm }: DeleteTaskBodyProps) {
                 label={
                   <>
                     Delete remote branch{' '}
-                    <span className="text-muted-foreground/50 font-normal">
-                      origin/{task.branch}
-                    </span>
+                    <span className="text-muted-fade-50 font-normal">origin/{task.branch}</span>
                   </>
                 }
               />
@@ -129,7 +127,7 @@ function DeleteTaskBody({ task, onConfirm }: DeleteTaskBodyProps) {
             type="button"
             onClick={close}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-full text-[13px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+            className="px-4 py-2 rounded-full text-[13px] text-muted-fade-60 hover:text-foreground hover:bg-accent/60 transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
           >
             Cancel
           </button>

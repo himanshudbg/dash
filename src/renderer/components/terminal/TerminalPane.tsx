@@ -160,7 +160,7 @@ export function TerminalPane({ id, cwd, permissionMode, terminalBg }: TerminalPa
             <Button size="sm" onClick={reattach}>
               Re-attach
             </Button>
-            <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed">
+            <p className="text-[10.5px] text-muted-fade-60 leading-relaxed">
               Inside the pane: <kbd className="font-mono">←</kbd> on an empty prompt opens agent
               view, <kbd className="font-mono">Esc</kbd> leaves it,{' '}
               <kbd className="font-mono">Ctrl+Z</kbd> detaches.

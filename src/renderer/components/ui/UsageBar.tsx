@@ -9,7 +9,7 @@ export function usageTextColor(percentage: number): string {
     ? 'text-red-400'
     : percentage >= 60
       ? 'text-amber-400'
-      : 'text-foreground/50';
+      : 'text-fg-fade-50';
 }
 
 interface UsageBarProps {
@@ -57,7 +57,7 @@ export function UsageBar({
   detail,
   height = 6,
   width,
-  labelClassName = 'text-[12px] text-foreground/80',
+  labelClassName = 'text-[12px] text-fg-fade-80',
   detailClassName = 'text-[11px]',
 }: UsageBarProps) {
   const pct = Math.min(percentage, 100);
@@ -71,7 +71,7 @@ export function UsageBar({
           {label && <span className={labelClassName}>{label}</span>}
           <span className={`${detailClassName} tabular-nums font-medium ${textColor}`}>
             {Math.round(pct)}%
-            {detail && <span className="text-foreground/40 font-normal ml-1.5">{detail}</span>}
+            {detail && <span className="text-fg-fade-40 font-normal ml-1.5">{detail}</span>}
           </span>
         </div>
       )}

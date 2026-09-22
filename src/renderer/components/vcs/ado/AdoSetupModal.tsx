@@ -50,14 +50,14 @@ function AdoSetupBody({ projectId, organizationUrl, project, onClose }: AdoSetup
         <h2 className="text-[14px] font-semibold text-foreground">Azure DevOps Detected</h2>
         <button
           onClick={close}
-          className="p-1.5 rounded-lg hover:bg-accent text-foreground/50 hover:text-foreground transition-all duration-150"
+          className="p-1.5 rounded-lg hover:bg-accent text-fg-fade-50 hover:text-foreground transition-all duration-150"
         >
           <X size={14} strokeWidth={2} />
         </button>
       </div>
 
       <div className="p-5 space-y-3">
-        <p className="text-[12px] text-muted-foreground/70">
+        <p className="text-[12px] text-muted-fade-70">
           This project uses an Azure DevOps remote. Add a Personal Access Token to enable work item
           linking.
         </p>
@@ -72,7 +72,7 @@ function AdoSetupBody({ projectId, organizationUrl, project, onClose }: AdoSetup
             onClick={() => {
               void conn.handleTest();
             }}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border/60 text-foreground/70 hover:bg-accent/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+            className="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border/60 text-fg-fade-70 hover:bg-accent/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
           >
             {conn.testing ? 'Testing...' : 'Test Connection'}
           </button>
@@ -80,7 +80,7 @@ function AdoSetupBody({ projectId, organizationUrl, project, onClose }: AdoSetup
             <button
               type="button"
               onClick={close}
-              className="px-4 py-2 rounded-lg text-[13px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/60 transition-all duration-150"
+              className="px-4 py-2 rounded-lg text-[13px] text-muted-fade-60 hover:text-foreground hover:bg-accent/60 transition-all duration-150"
             >
               Skip
             </button>

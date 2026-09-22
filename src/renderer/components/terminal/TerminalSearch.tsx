@@ -89,9 +89,9 @@ export function TerminalSearch({ searchAddon, onClose }: TerminalSearchProps) {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder="Find"
-        className="w-44 px-1 py-0.5 text-[12px] bg-transparent text-foreground placeholder:text-muted-foreground/40 outline-hidden"
+        className="w-44 px-1 py-0.5 text-[12px] bg-transparent text-foreground placeholder:text-muted-fade-40 outline-hidden"
       />
-      <span className="text-[10px] text-muted-foreground/70 font-mono min-w-[56px] text-right select-none">
+      <span className="text-[10px] text-muted-fade-70 font-mono min-w-[56px] text-right select-none">
         {counter}
       </span>
       <button
@@ -100,7 +100,7 @@ export function TerminalSearch({ searchAddon, onClose }: TerminalSearchProps) {
         className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors ${
           caseSensitive
             ? 'bg-primary/20 text-foreground'
-            : 'text-muted-foreground/70 hover:text-foreground'
+            : 'text-muted-fade-70 hover:text-foreground'
         }`}
         title="Match case"
       >
@@ -109,7 +109,7 @@ export function TerminalSearch({ searchAddon, onClose }: TerminalSearchProps) {
       <button
         type="button"
         onClick={findPrev}
-        className="p-1 text-muted-foreground/80 hover:text-foreground transition-colors"
+        className="p-1 text-muted-fade-80 hover:text-foreground transition-colors"
         title="Previous match (Shift+Enter)"
       >
         <ChevronUp size={14} strokeWidth={1.8} />
@@ -117,7 +117,7 @@ export function TerminalSearch({ searchAddon, onClose }: TerminalSearchProps) {
       <button
         type="button"
         onClick={findNext}
-        className="p-1 text-muted-foreground/80 hover:text-foreground transition-colors"
+        className="p-1 text-muted-fade-80 hover:text-foreground transition-colors"
         title="Next match (Enter)"
       >
         <ChevronDown size={14} strokeWidth={1.8} />
@@ -125,7 +125,7 @@ export function TerminalSearch({ searchAddon, onClose }: TerminalSearchProps) {
       <button
         type="button"
         onClick={handleClose}
-        className="p-1 text-muted-foreground/80 hover:text-foreground transition-colors"
+        className="p-1 text-muted-fade-80 hover:text-foreground transition-colors"
         title="Close (Esc)"
       >
         <X size={14} strokeWidth={1.8} />

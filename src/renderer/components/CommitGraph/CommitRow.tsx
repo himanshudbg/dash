@@ -206,12 +206,12 @@ export function CommitRow({
       {authorUrl ? (
         <GithubLink
           href={authorUrl}
-          className="text-[10px] text-muted-foreground/70 shrink-0 truncate max-w-[120px]"
+          className="text-[10px] text-muted-fade-70 shrink-0 truncate max-w-[120px]"
         >
           {commit.authorName}
         </GithubLink>
       ) : (
-        <span className="text-[10px] text-muted-foreground/70 shrink-0 truncate max-w-[120px]">
+        <span className="text-[10px] text-muted-fade-70 shrink-0 truncate max-w-[120px]">
           {commit.authorName}
         </span>
       )}
@@ -231,7 +231,7 @@ export function CommitRow({
       )}
 
       {/* Relative date */}
-      <span className="text-[10px] text-muted-foreground/70 shrink-0 w-14 text-right tabular-nums">
+      <span className="text-[10px] text-muted-fade-70 shrink-0 w-14 text-right tabular-nums">
         {formatRelativeDate(commit.authorDate)}
       </span>
     </div>

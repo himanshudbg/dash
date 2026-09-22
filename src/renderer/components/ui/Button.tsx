@@ -13,8 +13,8 @@ const buttonVariants = cva(
       variant: {
         primary: 'bg-primary text-primary-foreground hover:brightness-110',
         secondary:
-          'border border-border/60 text-foreground/80 hover:bg-accent hover:text-foreground hover:border-border',
-        ghost: 'text-foreground/70 hover:bg-accent hover:text-foreground',
+          'border border-border/60 text-fg-fade-80 hover:bg-accent hover:text-foreground hover:border-border',
+        ghost: 'text-fg-fade-70 hover:bg-accent hover:text-foreground',
       },
       size: {
         sm: 'gap-1 rounded-lg px-2.5 py-1 text-[11px]',

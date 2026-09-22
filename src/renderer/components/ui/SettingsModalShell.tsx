@@ -37,7 +37,7 @@ function SettingsModalShellBody({ title, children }: { title: string; children: 
         <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
         <button
           onClick={close}
-          className="p-1.5 rounded-lg hover:bg-accent text-foreground/50 hover:text-foreground transition-all duration-150"
+          className="p-1.5 rounded-lg hover:bg-accent text-fg-fade-50 hover:text-foreground transition-all duration-150"
         >
           <X size={14} strokeWidth={2} />
         </button>

@@ -67,7 +67,7 @@ export function RightInspector({
         {fileCount > 0 && (
           <span className="inspector-gitstats inline-flex items-center font-mono text-[10.5px] tabular-nums shrink-0">
             <span className="text-[hsl(var(--git-added))]">+{adds}</span>
-            <span className="mx-1.5 text-foreground/30">·</span>
+            <span className="mx-1.5 text-fg-fade-30">·</span>
             <span className="text-[hsl(var(--git-deleted))]">−{dels}</span>
           </span>
         )}

@@ -36,10 +36,10 @@ export function PortsDrawer({ taskId, state, collapsed, onCollapse, onExpand }: 
       {collapsed ? (
         <button
           onClick={onExpand}
-          className="h-full w-full flex items-center gap-2 px-4 text-foreground/80 hover:text-foreground transition-colors border-t border-edge/8 hover:bg-edge/4"
+          className="h-full w-full flex items-center gap-2 px-4 text-fg-fade-80 hover:text-foreground transition-colors border-t border-edge/8 hover:bg-edge/4"
         >
           <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">{LABEL}</span>
-          <span className="text-[10.5px] tabular-nums text-muted-foreground/80">{status}</span>
+          <span className="text-[10.5px] tabular-nums text-muted-fade-80">{status}</span>
           {state.anyRunning && (
             // A running service is a steady state — solid green, no pulse.
             <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--git-added))] shadow-[0_0_6px_hsl(var(--git-added)/0.55)]" />
@@ -51,7 +51,7 @@ export function PortsDrawer({ taskId, state, collapsed, onCollapse, onExpand }: 
           <span className="ports-label ml-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
             {LABEL}
           </span>
-          <span className="ports-status ml-2 text-[10.5px] tabular-nums text-muted-foreground/80">
+          <span className="ports-status ml-2 text-[10.5px] tabular-nums text-muted-fade-80">
             {status}
           </span>
           <div className="flex-1" />

@@ -26,10 +26,10 @@ export const CommandInput = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className = '', ...props }, ref) => (
   <div className="flex items-center gap-2 px-3 border-b border-border/60" cmdk-input-wrapper="">
-    <Search size={13} strokeWidth={1.8} className="text-muted-foreground/40 shrink-0" />
+    <Search size={13} strokeWidth={1.8} className="text-muted-fade-40 shrink-0" />
     <CommandPrimitive.Input
       ref={ref}
-      className={`flex h-9 w-full bg-transparent py-2.5 text-[13px] text-foreground outline-hidden placeholder:text-muted-foreground/40 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`flex h-9 w-full bg-transparent py-2.5 text-[13px] text-foreground outline-hidden placeholder:text-muted-fade-40 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       {...props}
     />
   </div>
@@ -54,7 +54,7 @@ export const CommandEmpty = React.forwardRef<
 >((props, ref) => (
   <CommandPrimitive.Empty
     ref={ref}
-    className="py-6 text-center text-[12px] text-muted-foreground/50"
+    className="py-6 text-center text-[12px] text-muted-fade-50"
     {...props}
   />
 ));
@@ -66,7 +66,7 @@ export const CommandGroup = React.forwardRef<
 >(({ className = '', ...props }, ref) => (
   <CommandPrimitive.Group
     ref={ref}
-    className={`overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/55 ${className}`}
+    className={`overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-fade-55 ${className}`}
     {...props}
   />
 ));

@@ -54,7 +54,7 @@ function ExtensionsBody({
       <div className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border/40 px-5">
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[14px] font-semibold tracking-tight text-foreground">Extensions</h2>
-          <span className="font-mono text-[11px] text-foreground/40">skills &amp; plugins</span>
+          <span className="font-mono text-[11px] text-fg-fade-40">skills &amp; plugins</span>
         </div>
         <div className="flex items-center gap-3">
           <Segmented

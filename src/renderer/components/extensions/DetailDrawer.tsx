@@ -27,28 +27,28 @@ function installedInLabel(ext: Ext, ref: DetailRef): string {
 function SourceBlock({ label, raw, files }: { label: string; raw?: string; files?: string[] }) {
   return (
     <div>
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/40">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-fade-40">
         {label}
       </div>
       <pre
-        className="whitespace-pre-wrap wrap-break-word rounded-lg px-3 py-2.5 font-mono text-[11px] leading-relaxed text-foreground/80"
+        className="whitespace-pre-wrap wrap-break-word rounded-lg px-3 py-2.5 font-mono text-[11px] leading-relaxed text-fg-fade-80"
         style={{ background: 'hsl(var(--surface-0))' }}
       >
         {raw?.trim() || 'No source found.'}
       </pre>
       {files && files.length > 0 && (
         <div className="mt-3">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/40">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-fade-40">
             Files · {files.length}
           </div>
           <div className="space-y-1">
             {files.map((f) => (
               <div
                 key={f}
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-mono text-[11px] text-foreground/70"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-mono text-[11px] text-fg-fade-70"
                 style={{ background: 'hsl(var(--surface-3))' }}
               >
-                <FileCode2 size={12} strokeWidth={1.8} className="shrink-0 text-foreground/40" />
+                <FileCode2 size={12} strokeWidth={1.8} className="shrink-0 text-fg-fade-40" />
                 <span className="truncate">{f}</span>
               </div>
             ))}
@@ -158,7 +158,7 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
               <span className="truncate text-[15px] font-semibold text-foreground">{name}</span>
               <span className={`${PILL} ${style.pill}`}>{style.label}</span>
             </div>
-            <div className="mt-0.5 font-mono text-[10.5px] text-foreground/45">{metaLine}</div>
+            <div className="mt-0.5 font-mono text-[10.5px] text-fg-fade-45">{metaLine}</div>
           </div>
           <IconButton onClick={ext.closeDetail} title="Close details">
             <X size={14} strokeWidth={2} />
@@ -168,20 +168,20 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
         {/* body */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {installedIn && (
-            <div className="text-[11px] text-foreground/55">
-              <span className="font-mono uppercase tracking-widest text-foreground/40">
+            <div className="text-[11px] text-fg-fade-55">
+              <span className="font-mono uppercase tracking-widest text-fg-fade-40">
                 Installed in
               </span>
-              <div className="mt-1 text-foreground/80">{installedIn}</div>
+              <div className="mt-1 text-fg-fade-80">{installedIn}</div>
             </div>
           )}
 
           {description && (
-            <p className="text-[12.5px] leading-relaxed text-foreground/80">{description}</p>
+            <p className="text-[12.5px] leading-relaxed text-fg-fade-80">{description}</p>
           )}
 
           {ext.detailLoading && (
-            <div className="flex justify-center py-6 text-foreground/40">
+            <div className="flex justify-center py-6 text-fg-fade-40">
               <Loader2 size={18} className="animate-spin" />
             </div>
           )}
@@ -189,7 +189,7 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
           {/* plugin: bundled components, grouped by type — all clickable to detail */}
           {ref.kind === 'plugin' && !ext.detailLoading && (
             <div className="space-y-3">
-              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/40">
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-fade-40">
                 Includes · {countComponents(ext.detailData.pluginComponents)} components
               </div>
               {COMPONENT_GROUPS.map(({ key, kind, label }) => {
@@ -197,7 +197,7 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
                 if (items.length === 0) return null;
                 return (
                   <div key={key} className="space-y-1.5">
-                    <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-foreground/35">
+                    <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-fg-fade-35">
                       {label} · {items.length}
                     </div>
                     {items.map((c) => (
@@ -222,7 +222,7 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
                 );
               })}
               {countComponents(ext.detailData.pluginComponents) === 0 && (
-                <div className="text-[11px] text-foreground/40">
+                <div className="text-[11px] text-fg-fade-40">
                   This plugin bundles no components.
                 </div>
               )}

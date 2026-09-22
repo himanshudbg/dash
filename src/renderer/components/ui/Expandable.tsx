@@ -20,7 +20,7 @@ export function Expandable({
   label,
   defaultOpen = false,
   hint,
-  labelClassName = 'text-muted-foreground/70',
+  labelClassName = 'text-muted-fade-70',
   children,
 }: ExpandableProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -39,7 +39,7 @@ export function Expandable({
           }`}
         />
         {label}
-        {hint && <span className="text-muted-foreground/40 font-normal">{hint}</span>}
+        {hint && <span className="text-muted-fade-40 font-normal">{hint}</span>}
       </button>
       <div className="collapse-grid" data-open={open}>
         <div className="pt-2">{children}</div>

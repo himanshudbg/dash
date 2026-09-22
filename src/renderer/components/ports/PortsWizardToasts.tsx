@@ -49,7 +49,7 @@ function Status({ icon, children }: { icon: React.ReactNode; children: React.Rea
   return (
     <div className="flex items-start gap-2.5">
       <span className="mt-0.5 shrink-0">{icon}</span>
-      <div className="text-[13px] text-foreground/90 leading-snug">{children}</div>
+      <div className="text-[13px] text-fg-fade-90 leading-snug">{children}</div>
     </div>
   );
 }
@@ -132,7 +132,7 @@ function renderScreen(
             <button
               type="button"
               onClick={() => send({ type: 'choice', screen: 'onboarding', value: 'not-relevant' })}
-              className="mr-auto whitespace-nowrap text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
+              className="mr-auto whitespace-nowrap text-[11px] text-muted-fade-70 hover:text-foreground transition-colors"
             >
               Never for this project
             </button>

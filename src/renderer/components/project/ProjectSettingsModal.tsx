@@ -48,7 +48,7 @@ export function ProjectSettingsModal({ project, onClose, onRename }: ProjectSett
       {value && (
         <>
           <ConfigureForm value={value} onChange={setValue} />
-          <p className="text-[10px] text-muted-foreground/50 font-mono truncate">{project.path}</p>
+          <p className="text-[10px] text-muted-fade-50 font-mono truncate">{project.path}</p>
           <div className="flex justify-end">
             <button
               onClick={() => void persist(value)}
@@ -59,7 +59,7 @@ export function ProjectSettingsModal({ project, onClose, onRename }: ProjectSett
           </div>
           {isAdoRemote(project.gitRemote) && (
             <div>
-              <label className="block text-[12px] font-medium text-muted-foreground/70 mb-2">
+              <label className="block text-[12px] font-medium text-muted-fade-70 mb-2">
                 Azure DevOps
               </label>
               <AdoConnectionForm projectId={project.id} />

@@ -80,7 +80,7 @@ export function ScopeMultiSelect({
         {chevron ? (
           <button
             onClick={chevron.onToggle}
-            className="shrink-0 p-1 text-foreground/35 hover:text-foreground/70"
+            className="shrink-0 p-1 text-fg-fade-35 hover:text-fg-fade-70"
             aria-label={chevron.open ? 'Collapse' : 'Expand'}
           >
             <ChevronRight
@@ -95,9 +95,7 @@ export function ScopeMultiSelect({
           onClick={() => !installed && toggleSel(id)}
           disabled={installed}
           className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1.5 text-[12px] transition-colors ${
-            installed
-              ? 'cursor-default text-foreground/40'
-              : 'text-foreground/80 hover:bg-accent/50'
+            installed ? 'cursor-default text-fg-fade-40' : 'text-fg-fade-80 hover:bg-accent/50'
           }`}
         >
           <span
@@ -107,9 +105,9 @@ export function ScopeMultiSelect({
           >
             {checked && <Check size={11} strokeWidth={3} />}
           </span>
-          <span className="text-foreground/45">{icon}</span>
+          <span className="text-fg-fade-45">{icon}</span>
           <span className="truncate">{label}</span>
-          {installed && <span className="ml-auto text-[10px] text-foreground/35">installed</span>}
+          {installed && <span className="ml-auto text-[10px] text-fg-fade-35">installed</span>}
         </button>
       </div>
     );

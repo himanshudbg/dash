@@ -99,7 +99,7 @@ export function RotationSection({
   return (
     <div className="px-2 pt-1.5 pb-1.5 mb-0.5">
       <Tooltip content="Cycle with Ctrl+Tab">
-        <span className="block px-2 pb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70 select-none">
+        <span className="block px-2 pb-1 font-mono text-[10px] uppercase tracking-wider text-muted-fade-70 select-none">
           Active tasks
         </span>
       </Tooltip>
@@ -194,7 +194,7 @@ export function RotationSection({
                       </div>
                     </div>
                     {project && (
-                      <span className="truncate text-[10px] text-muted-foreground/50 font-normal mt-0.5">
+                      <span className="truncate text-[10px] text-muted-fade-50 font-normal mt-0.5">
                         {project.name}
                       </span>
                     )}

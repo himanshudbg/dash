@@ -87,12 +87,12 @@ export function BrowseView({ scopes, ext }: { scopes: ExtensionScopeRef[]; ext: 
           ]}
         />
         <div className="ml-auto flex items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 focus-within:border-primary/40">
-          <Search size={13} className="text-foreground/40" />
+          <Search size={13} className="text-fg-fade-40" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search…"
-            className="w-48 bg-transparent text-[12px] text-foreground outline-hidden placeholder:text-foreground/35"
+            className="w-48 bg-transparent text-[12px] text-foreground outline-hidden placeholder:text-fg-fade-35"
           />
         </div>
       </div>
@@ -129,9 +129,9 @@ export function BrowseView({ scopes, ext }: { scopes: ExtensionScopeRef[]; ext: 
                 ))}
                 <button
                   onClick={() => setSidebarMode('add-marketplace')}
-                  className="mt-1 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground"
+                  className="mt-1 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-fg-fade-60 transition-colors hover:bg-accent/50 hover:text-foreground"
                 >
-                  <Plus size={13} strokeWidth={1.8} className="shrink-0 text-foreground/40" />
+                  <Plus size={13} strokeWidth={1.8} className="shrink-0 text-fg-fade-40" />
                   Add marketplace
                 </button>
               </div>
@@ -139,20 +139,18 @@ export function BrowseView({ scopes, ext }: { scopes: ExtensionScopeRef[]; ext: 
           ) : (
             <div className="space-y-0.5">
               <SourceRow label="Skills registry" active onClick={() => undefined} />
-              <p className="px-2.5 py-1 text-[10.5px] leading-relaxed text-foreground/40">
+              <p className="px-2.5 py-1 text-[10.5px] leading-relaxed text-fg-fade-40">
                 Community index{' '}
-                <span className="font-mono text-foreground/55">
-                  majiayu000/claude-skill-registry
-                </span>{' '}
+                <span className="font-mono text-fg-fade-55">majiayu000/claude-skill-registry</span>{' '}
                 — ranked by GitHub stars.
               </p>
               <button
                 onClick={() =>
                   setSidebarMode(sidebarMode === 'add-skill' ? 'sources' : 'add-skill')
                 }
-                className="mt-1 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground"
+                className="mt-1 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-fg-fade-60 transition-colors hover:bg-accent/50 hover:text-foreground"
               >
-                <Plus size={13} strokeWidth={1.8} className="shrink-0 text-foreground/40" />
+                <Plus size={13} strokeWidth={1.8} className="shrink-0 text-fg-fade-40" />
                 Add skill from a repo
               </button>
               {sidebarMode === 'add-skill' && (
@@ -256,14 +254,14 @@ function SourceRow({
       className={`group flex w-full items-center rounded-md transition-colors ${
         active
           ? 'bg-[hsl(var(--surface-3))] text-foreground'
-          : 'text-foreground/60 hover:bg-accent/50 hover:text-foreground'
+          : 'text-fg-fade-60 hover:bg-accent/50 hover:text-foreground'
       }`}
     >
       <button
         onClick={onClick}
         className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-[12px]"
       >
-        <Store size={13} strokeWidth={1.8} className="shrink-0 text-foreground/40" />
+        <Store size={13} strokeWidth={1.8} className="shrink-0 text-fg-fade-40" />
         <span className="truncate">{label}</span>
       </button>
       {onRemove && (
@@ -271,7 +269,7 @@ function SourceRow({
           onClick={onRemove}
           disabled={busy}
           title="Remove marketplace"
-          className="shrink-0 px-2 py-1.5 text-foreground/30 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          className="shrink-0 px-2 py-1.5 text-fg-fade-30 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
         >
           {busy ? (
             <Loader2 size={12} className="animate-spin" />
@@ -318,11 +316,11 @@ function AddMarketplaceForm({
     <div className="space-y-2.5 px-1 pt-1">
       <button
         onClick={onDone}
-        className="flex items-center gap-1 text-[11px] text-foreground/55 hover:text-foreground"
+        className="flex items-center gap-1 text-[11px] text-fg-fade-55 hover:text-foreground"
       >
         <ChevronLeft size={12} /> Sources
       </button>
-      <div className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
+      <div className="text-[11px] font-semibold uppercase tracking-widest text-fg-fade-70">
         Add marketplace
       </div>
       <textarea
@@ -330,10 +328,10 @@ function AddMarketplaceForm({
         onChange={(e) => setSource(e.target.value)}
         rows={2}
         placeholder="owner/repo, git URL, local path, or marketplace.json URL"
-        className="w-full resize-none rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-foreground/35 focus:border-primary/40"
+        className="w-full resize-none rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-fg-fade-35 focus:border-primary/40"
       />
       <div className="space-y-1">
-        <label className="block text-[10px] uppercase tracking-[0.08em] text-foreground/45">
+        <label className="block text-[10px] uppercase tracking-[0.08em] text-fg-fade-45">
           Scope
         </label>
         <Select
@@ -347,14 +345,14 @@ function AddMarketplaceForm({
         />
       </div>
       <div className="space-y-1">
-        <label className="block text-[10px] uppercase tracking-[0.08em] text-foreground/45">
-          Sparse paths <span className="normal-case text-foreground/30">(monorepo, optional)</span>
+        <label className="block text-[10px] uppercase tracking-[0.08em] text-fg-fade-45">
+          Sparse paths <span className="normal-case text-fg-fade-30">(monorepo, optional)</span>
         </label>
         <input
           value={sparse}
           onChange={(e) => setSparse(e.target.value)}
           placeholder=".claude-plugin plugins"
-          className="w-full rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-foreground/35 focus:border-primary/40"
+          className="w-full rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-fg-fade-35 focus:border-primary/40"
         />
       </div>
       <Button size="sm" className="w-full" disabled={!source.trim() || busy} onClick={submit}>
@@ -383,11 +381,11 @@ function AddSkillForm({
   const busy = ext.busy === `add:${folder}`;
 
   const field =
-    'w-full rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-foreground/35 focus:border-primary/40';
+    'w-full rounded-lg border border-border/60 bg-transparent px-2 py-1.5 text-[11px] text-foreground outline-hidden placeholder:text-fg-fade-35 focus:border-primary/40';
 
   return (
     <div className="mt-1 space-y-2 rounded-lg border border-border/50 p-2">
-      <div className="text-[10px] uppercase tracking-[0.08em] text-foreground/45">
+      <div className="text-[10px] uppercase tracking-[0.08em] text-fg-fade-45">
         Add skill from a repo
       </div>
       <input
@@ -476,12 +474,12 @@ function CatalogRow({
           </span>
           <InstallBadge scopeIds={installedScopeIds} names={installedNames} />
         </div>
-        <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-foreground/70">
-          <span className="shrink-0 text-foreground/45">{sourceIcon}</span>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-fg-fade-70">
+          <span className="shrink-0 text-fg-fade-45">{sourceIcon}</span>
           <span className="truncate">{source}</span>
         </div>
         {description && (
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-foreground/45">
+          <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-fg-fade-45">
             {description}
           </div>
         )}

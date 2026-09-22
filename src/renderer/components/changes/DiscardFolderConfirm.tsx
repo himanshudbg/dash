@@ -44,9 +44,9 @@ export function DiscardFolderConfirm({
     <div className="w-[320px] p-3 flex flex-col gap-2.5">
       <div>
         <h4 className="text-[12px] font-semibold text-foreground tracking-tight">Discard folder</h4>
-        <p className="text-[11px] font-mono text-muted-foreground/80 truncate mt-0.5">
+        <p className="text-[11px] font-mono text-muted-fade-80 truncate mt-0.5">
           {folderName}/{' '}
-          <span className="text-muted-foreground/60">
+          <span className="text-muted-fade-60">
             · {totalCount} {totalCount === 1 ? 'file' : 'files'}
           </span>
         </p>
@@ -58,7 +58,7 @@ export function DiscardFolderConfirm({
             className="font-mono text-[11px] truncate py-0.5 px-1.5 rounded hover:bg-[hsl(var(--surface-2)/0.4)]"
             title={item.rel}
           >
-            {item.dir && <span className="text-muted-foreground/60">{item.dir}</span>}
+            {item.dir && <span className="text-muted-fade-60">{item.dir}</span>}
             <span className="text-foreground">{item.base}</span>
           </div>
         ))}
@@ -68,7 +68,7 @@ export function DiscardFolderConfirm({
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="px-3 h-8 rounded-md text-[11.5px] text-muted-foreground/80 hover:text-foreground hover:bg-accent/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          className="px-3 h-8 rounded-md text-[11.5px] text-muted-fade-80 hover:text-foreground hover:bg-accent/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
           Cancel
         </button>

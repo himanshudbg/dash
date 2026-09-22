@@ -47,6 +47,22 @@
   --font-mono: var(--font-mono);
 }
 
+/* Faded text: `text-muted-fade-50` is `text-muted-foreground/50` and
+   `text-fg-fade-40` is `text-foreground/40` in dark; in light the fade is
+   scaled by --text-fade-k so the text stays readable on paper. `fade-50` is
+   the same for `opacity-50` on text. Use these instead of /N on text colours. */
+@utility text-muted-fade-* {
+  color: hsl(
+    var(--muted-foreground) / calc(1 - (1 - --value(integer) * 0.01) * var(--text-fade-k))
+  );
+}
+@utility text-fg-fade-* {
+  color: hsl(var(--foreground) / calc(1 - (1 - --value(integer) * 0.01) * var(--text-fade-k)));
+}
+@utility fade-* {
+  opacity: calc(1 - (1 - --value(integer) * 0.01) * var(--text-fade-k));
+}
+
 /* ── Obsidian Console Design System ─────────────────────── */
 
 @layer base {
@@ -63,7 +79,7 @@
     --secondary: 40 30% 94%;
     --secondary-foreground: 36 11% 10%;
     --muted: 40 30% 94%;
-    --muted-foreground: 36 11% 36%;
+    --muted-foreground: 36 11% 26%;
     --accent: 40 30% 92%;
     --accent-foreground: 36 11% 10%;
     --destructive: 0 72% 51%; /* bright red */
@@ -94,6 +110,12 @@
     --glass-fill-k: 1.3; /* opacity of the frosted surface fill */
     --glass-base: 0.6; /* solid paper under the fill, so the top sheen isn't see-through */
     --scrim: 36 11% 10% / 0.22; /* modal backdrop */
+
+    /* Faded text (text-muted-fade-N, text-fg-fade-N, fade-N) removes this
+       share of the fade: on paper an alpha fade loses contrast much faster than
+       on graphite, so light fades gentler. Tuned so each tier's contrast
+       matches dark's. */
+    --text-fade-k: 0.7;
 
     --warn: 38 92% 50%; /* bright amber */
     --warn-foreground: 0 0% 100%;
@@ -183,6 +205,7 @@
     --glass-fill-k: 1;
     --glass-base: 0;
     --scrim: 0 0% 0% / 0.55;
+    --text-fade-k: 1;
 
     --warn: 42 95% 60%; /* bright amber for usage warn tier */
     --warn-foreground: 240 10% 5%;
@@ -1260,7 +1283,7 @@
   width: 16px;
   height: 16px;
   border-radius: 3px;
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: hsl(var(--muted-foreground) / calc(1 - 0.45 * var(--text-fade-k)));
   cursor: pointer;
   transition:
     color 120ms ease,
@@ -1310,7 +1333,7 @@
   font-family: 'SF Mono', ui-monospace, Menlo, monospace;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
-  color: hsl(var(--muted-foreground) / 0.5);
+  color: hsl(var(--muted-foreground) / calc(1 - 0.5 * var(--text-fade-k)));
 }
 .blame-label-summary {
   font-size: 10px;

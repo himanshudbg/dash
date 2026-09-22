@@ -25,7 +25,7 @@ export function StaleBanner({ onOverwrite, onReload, onCancel }: Props) {
         </button>
         <button
           onClick={onCancel}
-          className="px-2 py-1 rounded-md text-[11px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/60"
+          className="px-2 py-1 rounded-md text-[11px] text-muted-fade-60 hover:text-foreground hover:bg-accent/60"
         >
           Cancel
         </button>

@@ -32,7 +32,7 @@ const FOLDER_TINT: Record<FileChangeStatus, string> = {
   untracked: 'text-[hsl(var(--git-untracked))]',
   conflicted: 'text-[hsl(var(--git-conflicted)/0.85)]',
   // `git status` never emits 'ignored'; key present only for the record type.
-  ignored: 'text-muted-foreground/40',
+  ignored: 'text-muted-fade-40',
 };
 
 export function FolderRow({
@@ -54,7 +54,7 @@ export function FolderRow({
   // === 'renamed'); changes to its contents don't tint it. Otherwise the name is
   // a muted foreground — dimmer than full white, but kept warm so it never reads
   // as the grey untracked tint.
-  const nameTint = agg.status !== 'mixed' ? FOLDER_TINT[agg.status] : 'text-foreground/75';
+  const nameTint = agg.status !== 'mixed' ? FOLDER_TINT[agg.status] : 'text-fg-fade-75';
   return (
     <div
       role="button"
@@ -74,7 +74,7 @@ export function FolderRow({
           <span className="absolute left-px top-[-2px] bottom-[-2px] w-px bg-[hsl(var(--border)/0.5)]" />
         </span>
       ))}
-      <span className="shrink-0 w-[14px] h-[14px] inline-flex items-center justify-center text-muted-foreground/55">
+      <span className="shrink-0 w-[14px] h-[14px] inline-flex items-center justify-center text-muted-fade-55">
         {open ? (
           <ChevronDown size={12} strokeWidth={1.8} />
         ) : (
@@ -84,7 +84,7 @@ export function FolderRow({
       <span className={`flex-1 min-w-0 font-mono text-[11.5px] truncate font-medium ${nameTint}`}>
         {displayName}/
       </span>
-      <span className="font-mono text-[10px] font-semibold tabular-nums shrink-0 text-muted-foreground/70">
+      <span className="font-mono text-[10px] font-semibold tabular-nums shrink-0 text-muted-fade-70">
         {agg.count}
       </span>
       {!open && (
@@ -99,7 +99,7 @@ export function FolderRow({
               ) : null}
             </>
           ) : agg.untrackedAdd ? (
-            <span className="text-muted-foreground/70">+{agg.untrackedAdd}</span>
+            <span className="text-muted-fade-70">+{agg.untrackedAdd}</span>
           ) : null}
         </span>
       )}

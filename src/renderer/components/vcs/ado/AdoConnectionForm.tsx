@@ -56,12 +56,12 @@ export function AdoConnectionForm({ projectId }: AdoConnectionFormProps) {
             {configured ? (
               <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={2.5} />
             ) : (
-              <AlertCircle size={14} className="text-muted-foreground/40" strokeWidth={2} />
+              <AlertCircle size={14} className="text-muted-fade-40" strokeWidth={2} />
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-foreground/90">Azure DevOps</p>
-            <p className="text-[11px] text-foreground/50">
+            <p className="text-[13px] font-medium text-fg-fade-90">Azure DevOps</p>
+            <p className="text-[11px] text-fg-fade-50">
               {configured ? 'Connected' : 'Not configured'}
             </p>
           </div>
@@ -103,7 +103,7 @@ export function AdoConnectionForm({ projectId }: AdoConnectionFormProps) {
                 onClick={() => {
                   void conn.handleTest();
                 }}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border/60 text-foreground/70 hover:bg-accent/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                className="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border/60 text-fg-fade-70 hover:bg-accent/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
               >
                 {conn.testing ? 'Testing...' : 'Test Connection'}
               </button>

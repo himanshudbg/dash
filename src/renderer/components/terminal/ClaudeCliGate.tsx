@@ -45,13 +45,11 @@ export function ClaudeCliGate({ info }: { info: ClaudeCliInfo }) {
                 ? `Dash runs task sessions on Claude Code ${info.minVersion} or newer. This machine has ${info.version ?? 'an unknown version'}.`
                 : `Dash runs task sessions through the Claude Code CLI (${info.minVersion} or newer).`}
             </p>
-            <pre className="mt-3 px-3 py-2 rounded-lg bg-accent/80 text-[11px] font-mono text-foreground/80 overflow-x-auto">
+            <pre className="mt-3 px-3 py-2 rounded-lg bg-accent/80 text-[11px] font-mono text-fg-fade-80 overflow-x-auto">
               {command}
             </pre>
             {info.path && (
-              <p className="text-[10.5px] text-foreground/40 font-mono truncate mt-2">
-                {info.path}
-              </p>
+              <p className="text-[10.5px] text-fg-fade-40 font-mono truncate mt-2">{info.path}</p>
             )}
             <button
               onClick={() => void recheck()}

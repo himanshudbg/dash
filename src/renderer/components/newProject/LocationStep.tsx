@@ -11,8 +11,8 @@ interface LocationStepProps {
 }
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150';
-const labelClass = 'block text-[12px] font-medium text-muted-foreground/70 mb-2';
+  'w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-fade-30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150';
+const labelClass = 'block text-[12px] font-medium text-muted-fade-70 mb-2';
 
 async function detectAndResolve(
   path: string,
@@ -45,7 +45,7 @@ export function LocationStep({ source, onResolved }: LocationStepProps) {
   if (source === 'local') {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-[12px] text-muted-foreground/70">Choose an existing project folder.</p>
+        <p className="text-[12px] text-muted-fade-70">Choose an existing project folder.</p>
         <button
           onClick={() =>
             void (async () => {
@@ -93,13 +93,13 @@ export function LocationStep({ source, onResolved }: LocationStepProps) {
             />
             <button
               onClick={() => void pickFolder(setParentDir)}
-              className="px-3 rounded-lg border border-border/60 text-[12px] text-foreground/80 hover:bg-accent/40"
+              className="px-3 rounded-lg border border-border/60 text-[12px] text-fg-fade-80 hover:bg-accent/40"
             >
               Change…
             </button>
           </div>
         </div>
-        <label className="flex items-center gap-2 text-[13px] text-foreground/90 cursor-pointer">
+        <label className="flex items-center gap-2 text-[13px] text-fg-fade-90 cursor-pointer">
           <input
             type="checkbox"
             checked={initGit}
@@ -174,7 +174,7 @@ export function LocationStep({ source, onResolved }: LocationStepProps) {
           />
           <button
             onClick={() => void pickFolder(setParentDir)}
-            className="px-3 rounded-lg border border-border/60 text-[12px] text-foreground/80 hover:bg-accent/40"
+            className="px-3 rounded-lg border border-border/60 text-[12px] text-fg-fade-80 hover:bg-accent/40"
           >
             Change…
           </button>

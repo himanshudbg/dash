@@ -90,7 +90,7 @@ export function EditorHeader({
   // icon primary; hover gives a subtle surface for affordance.
   const iconBtn = (active: boolean) =>
     `p-1.5 rounded-md transition-colors hover:bg-accent/60 ${
-      active ? 'text-primary' : 'text-muted-foreground/60 hover:text-foreground'
+      active ? 'text-primary' : 'text-muted-fade-60 hover:text-foreground'
     }`;
 
   function handleChipClick() {
@@ -157,7 +157,7 @@ export function EditorHeader({
                   type="button"
                   onClick={handleChipClick}
                   className={`inline-flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-mono transition-colors hover:bg-accent/60 ${
-                    isBranch ? 'text-primary' : 'text-muted-foreground/60 hover:text-foreground'
+                    isBranch ? 'text-primary' : 'text-muted-fade-60 hover:text-foreground'
                   }`}
                 >
                   <GitCompare size={12} strokeWidth={1.8} className="shrink-0" />
@@ -192,7 +192,7 @@ export function EditorHeader({
         <Tooltip content="Close">
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent/60 transition-colors"
+            className="p-1.5 rounded-md text-muted-fade-60 hover:text-foreground hover:bg-accent/60 transition-colors"
           >
             <X size={14} strokeWidth={2} />
           </button>

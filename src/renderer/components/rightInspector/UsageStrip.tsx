@@ -31,7 +31,7 @@ function Row({ label, pct, detail }: { label: string; pct: number; detail?: Deta
     <div className="grid grid-rows-[auto_3px] gap-[5px]">
       <div className="flex items-baseline justify-between gap-x-2 min-w-0">
         <span
-          className="font-mono text-[9.5px] tracking-[0.18em] uppercase text-muted-foreground/70 font-medium truncate min-w-0"
+          className="font-mono text-[9.5px] tracking-[0.18em] uppercase text-muted-fade-70 font-medium truncate min-w-0"
           title={label}
         >
           {label}

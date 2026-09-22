@@ -23,7 +23,7 @@ export function CascadeConfirm({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--warn)/0.15)] text-[hsl(var(--warn))]">
             <AlertTriangle size={18} strokeWidth={1.8} />
           </div>
-          <div className="pt-0.5 text-[12.5px] leading-relaxed text-foreground/80">{message}</div>
+          <div className="pt-0.5 text-[12.5px] leading-relaxed text-fg-fade-80">{message}</div>
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" size="sm" onClick={onCancel}>

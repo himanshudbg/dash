@@ -55,14 +55,14 @@ function EditCommentsBody({
       <div className="flex items-center justify-between px-5 h-12 border-b border-border/40">
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[14px] font-semibold text-foreground">Edit before sending</h2>
-          <span className="text-[11.5px] text-muted-foreground/65">
-            based on <span className="font-medium text-foreground/80 tabular-nums">{count}</span>{' '}
+          <span className="text-[11.5px] text-muted-fade-65">
+            based on <span className="font-medium text-fg-fade-80 tabular-nums">{count}</span>{' '}
             {count === 1 ? 'comment' : 'comments'}
           </span>
         </div>
         <button
           onClick={close}
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all duration-150"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all duration-150"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -81,11 +81,11 @@ function EditCommentsBody({
             }
           }}
           spellCheck={false}
-          className="min-h-[520px] max-h-[70vh] w-full text-[12px] leading-relaxed font-mono bg-foreground/4 rounded-md px-3 py-2 resize-y placeholder:text-muted-foreground/40 focus:outline-hidden"
+          className="min-h-[520px] max-h-[70vh] w-full text-[12px] leading-relaxed font-mono bg-foreground/4 rounded-md px-3 py-2 resize-y placeholder:text-muted-fade-40 focus:outline-hidden"
         />
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[10.5px] text-muted-foreground/55">
+          <span className="text-[10.5px] text-muted-fade-55">
             <kbd className="font-mono px-1 py-0.5 rounded bg-foreground/6 border border-edge/6">
               ⌘
             </kbd>
@@ -99,7 +99,7 @@ function EditCommentsBody({
             <button
               type="button"
               onClick={close}
-              className="px-4 py-2 rounded-full text-[13px] text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 transition-all duration-150"
+              className="px-4 py-2 rounded-full text-[13px] text-muted-fade-70 hover:text-foreground hover:bg-accent/60 transition-all duration-150"
             >
               Cancel
             </button>

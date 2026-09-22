@@ -92,7 +92,7 @@ function WizardBody({ onCreated }: { onCreated: (id: string) => void }) {
         <h2 className="text-[14px] font-semibold text-foreground">New Project</h2>
         <button
           onClick={close}
-          className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground/50 hover:text-foreground transition-all"
+          className="p-1.5 rounded-lg hover:bg-accent text-muted-fade-50 hover:text-foreground transition-all"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -102,7 +102,7 @@ function WizardBody({ onCreated }: { onCreated: (id: string) => void }) {
       <div className="flex items-center gap-2 px-5 py-3 text-[11px] border-b border-border/30">
         {STEP_ORDER.map((s, i) => (
           <React.Fragment key={s}>
-            {i > 0 && <span className="text-muted-foreground/30">—</span>}
+            {i > 0 && <span className="text-muted-fade-30">—</span>}
             <button
               disabled={!reached(s)}
               onClick={() => setStep(s)}
@@ -111,7 +111,7 @@ function WizardBody({ onCreated }: { onCreated: (id: string) => void }) {
                   ? 'bg-primary text-primary-foreground'
                   : reached(s)
                     ? 'text-muted-foreground hover:text-foreground'
-                    : 'text-muted-foreground/30'
+                    : 'text-muted-fade-30'
               }`}
             >
               {i + 1} · {STEP_TITLE[s]}
@@ -145,7 +145,7 @@ function WizardBody({ onCreated }: { onCreated: (id: string) => void }) {
             if (idx > 0) setStep(STEP_ORDER[idx - 1]!);
           }}
           disabled={step === 'source'}
-          className="text-[13px] text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+          className="text-[13px] text-muted-fade-60 hover:text-foreground disabled:opacity-30"
         >
           ← Back
         </button>

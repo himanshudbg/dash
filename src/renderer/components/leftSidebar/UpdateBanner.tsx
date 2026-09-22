@@ -31,7 +31,7 @@ export function UpdateBanner() {
           <Download size={14} strokeWidth={1.8} className="text-muted-foreground shrink-0" />
           <span className="text-[11px] text-muted-foreground truncate">Downloading {version}…</span>
           {status.percent !== null && (
-            <span className="text-[11px] text-muted-foreground/70 tabular-nums ml-auto">
+            <span className="text-[11px] text-muted-fade-70 tabular-nums ml-auto">
               {status.percent}%
             </span>
           )}
@@ -48,7 +48,7 @@ export function UpdateBanner() {
   if (status.state === 'ready') {
     return (
       <Shell>
-        <p className="text-[11px] text-foreground/90 leading-snug">
+        <p className="text-[11px] text-fg-fade-90 leading-snug">
           {status.availableVersion ? `v${status.availableVersion}` : 'An update'} is ready.
         </p>
         <p className="text-[10.5px] text-muted-foreground mt-0.5 leading-snug">
@@ -80,7 +80,7 @@ export function UpdateBanner() {
             className="text-[hsl(var(--destructive))] shrink-0 mt-px"
           />
           <div className="min-w-0">
-            <p className="text-[11px] text-foreground/90 leading-snug">
+            <p className="text-[11px] text-fg-fade-90 leading-snug">
               {status.availableVersion ? `v${status.availableVersion}` : 'An update'} could not be
               downloaded.
             </p>

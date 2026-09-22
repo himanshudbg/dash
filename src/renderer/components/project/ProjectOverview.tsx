@@ -312,14 +312,14 @@ export function ProjectOverview({
                     <div className="flex flex-col gap-1.5 flex-1 text-[11px] w-full overflow-hidden">
                       {task.branch && (
                         <div className="text-muted-foreground truncate">
-                          <span className="text-muted-foreground/70">Branch: </span>
+                          <span className="text-muted-fade-70">Branch: </span>
                           {task.branch}
                         </div>
                       )}
 
                       {task.useWorktree && task.path && (
                         <div className="text-muted-foreground truncate">
-                          <span className="text-muted-foreground/70">Worktree: </span>
+                          <span className="text-muted-fade-70">Worktree: </span>
                           <span className="font-mono text-[10px]">
                             {task.path.split(/[\\/]/).slice(-2).join('/')}
                           </span>
@@ -338,9 +338,7 @@ export function ProjectOverview({
                               : 'Issues:';
                           return (
                             <div className="flex items-start gap-1.5 text-muted-foreground">
-                              <span className="shrink-0 text-muted-foreground/70 mt-0.5">
-                                {label}
-                              </span>
+                              <span className="shrink-0 text-muted-fade-70 mt-0.5">{label}</span>
                               <div className="flex flex-wrap gap-1.5">
                                 {linkedItems.slice(0, 3).map((item) => {
                                   const url = linkedItemUrl(item, project.gitRemote);
@@ -388,7 +386,7 @@ export function ProjectOverview({
 
                       {prByTask[task.id] && (
                         <div className="flex items-start gap-1.5 text-muted-foreground">
-                          <span className="shrink-0 text-muted-foreground/70 mt-0.5">PR:</span>
+                          <span className="shrink-0 text-muted-fade-70 mt-0.5">PR:</span>
                           <PrBadge prInfo={prByTask[task.id]!} size="sm" />
                         </div>
                       )}
@@ -461,14 +459,14 @@ export function ProjectOverview({
                       </div>
 
                       {task.branch && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 mb-1.5">
-                          <span className="shrink-0 text-muted-foreground/50">Branch:</span>
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-fade-70 mb-1.5">
+                          <span className="shrink-0 text-muted-fade-50">Branch:</span>
                           <span className="truncate">{task.branch}</span>
                         </div>
                       )}
 
                       <div className="flex items-center justify-between mt-2 pt-2.5 border-t border-border/30">
-                        <span className="text-[10px] text-muted-foreground/70">
+                        <span className="text-[10px] text-muted-fade-70">
                           Archived {timeAgo(task.archivedAt!)}
                         </span>
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

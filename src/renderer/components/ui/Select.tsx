@@ -64,7 +64,7 @@ export function Select<T extends string>({
               <DropdownMenuPrimitive.RadioItem
                 key={opt.value}
                 value={opt.value}
-                className="relative w-full flex items-center justify-between gap-2 pl-2.5 pr-2 py-1.5 rounded text-[12px] cursor-default outline-hidden transition-colors data-highlighted:bg-accent text-foreground/85 data-[state=checked]:text-foreground"
+                className="relative w-full flex items-center justify-between gap-2 pl-2.5 pr-2 py-1.5 rounded text-[12px] cursor-default outline-hidden transition-colors data-highlighted:bg-accent text-fg-fade-85 data-[state=checked]:text-foreground"
               >
                 <span className="truncate text-left">{render(opt)}</span>
                 <DropdownMenuPrimitive.ItemIndicator>

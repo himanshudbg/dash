@@ -49,9 +49,7 @@ export function TaskSettingsModal({
   return (
     <SettingsModalShell title="Task Settings" onClose={onClose}>
       <div>
-        <label className="block text-[12px] font-medium text-muted-foreground/70 mb-2">
-          Task name
-        </label>
+        <label className="block text-[12px] font-medium text-muted-fade-70 mb-2">Task name</label>
         <input
           type="text"
           value={name}
@@ -60,11 +58,9 @@ export function TaskSettingsModal({
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSaveName();
           }}
-          className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150"
+          className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[13px] placeholder:text-muted-fade-30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150"
         />
-        <p className="text-[10px] text-muted-foreground/50 mt-1.5 font-mono truncate">
-          {task.branch}
-        </p>
+        <p className="text-[10px] text-muted-fade-50 mt-1.5 font-mono truncate">{task.branch}</p>
       </div>
 
       <PermissionModePicker
@@ -87,7 +83,7 @@ export function TaskSettingsModal({
         >
           <div className="space-y-3" onBlur={handleSaveScripts}>
             <div>
-              <label className="block text-[11px] font-medium text-muted-foreground/60 mb-1.5">
+              <label className="block text-[11px] font-medium text-muted-fade-60 mb-1.5">
                 Setup
               </label>
               <textarea
@@ -95,14 +91,14 @@ export function TaskSettingsModal({
                 onChange={(e) => setSetupScript(e.target.value)}
                 rows={3}
                 placeholder={'pnpm install'}
-                className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[12px] font-mono placeholder:text-muted-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150 resize-none"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[12px] font-mono placeholder:text-muted-fade-30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150 resize-none"
               />
-              <p className="text-[10px] text-muted-foreground/40 mt-1">
+              <p className="text-[10px] text-muted-fade-40 mt-1">
                 Already ran when this worktree was created — affects future re-runs only.
               </p>
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-muted-foreground/60 mb-1.5">
+              <label className="block text-[11px] font-medium text-muted-fade-60 mb-1.5">
                 Teardown — runs before this worktree is removed
               </label>
               <textarea
@@ -110,7 +106,7 @@ export function TaskSettingsModal({
                 onChange={(e) => setTeardownScript(e.target.value)}
                 rows={2}
                 placeholder={'docker compose down'}
-                className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[12px] font-mono placeholder:text-muted-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150 resize-none"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-transparent border border-input/60 text-foreground text-[12px] font-mono placeholder:text-muted-fade-30 focus:outline-hidden focus:ring-2 focus:ring-ring/30 focus:border-ring/50 transition-all duration-150 resize-none"
               />
             </div>
           </div>

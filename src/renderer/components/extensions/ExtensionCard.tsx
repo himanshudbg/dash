@@ -66,8 +66,8 @@ export const KIND_STYLE: Record<PluginComponentKind, KindStyle> = {
   },
   hook: {
     Icon: Webhook,
-    accent: 'bg-foreground/10 text-foreground/60',
-    pill: 'bg-foreground/10 text-foreground/55',
+    accent: 'bg-foreground/10 text-fg-fade-60',
+    pill: 'bg-foreground/10 text-fg-fade-55',
     label: 'Hook',
   },
 };
@@ -81,7 +81,7 @@ export function ProvenanceBadge({ provenance }: { provenance?: Provenance }) {
       className={`inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[9.5px] font-medium ${
         overridden
           ? 'bg-[hsl(var(--warn)/0.15)] text-[hsl(var(--warn))]'
-          : 'bg-foreground/10 text-foreground/45'
+          : 'bg-foreground/10 text-fg-fade-45'
       }`}
     >
       <CornerDownRight size={10} strokeWidth={2} />
@@ -140,7 +140,7 @@ export function ComponentCard({
           <ProvenanceBadge provenance={provenance} />
         </div>
         {subtitle && (
-          <span className="mt-0.5 block truncate font-mono text-[10.5px] text-foreground/40">
+          <span className="mt-0.5 block truncate font-mono text-[10.5px] text-fg-fade-40">
             {subtitle}
           </span>
         )}
@@ -194,7 +194,7 @@ function BusyToggle({
   onToggle: (value: boolean) => void;
   label: string;
 }) {
-  if (busy) return <Loader2 size={16} className="animate-spin text-foreground/40" />;
+  if (busy) return <Loader2 size={16} className="animate-spin text-fg-fade-40" />;
   return <Switch enabled={on} onToggle={onToggle} aria-label={label} />;
 }
 
@@ -253,14 +253,14 @@ export function PluginRow({
             </span>
             <span className={`${PILL} ${PLUGIN_STYLE.pill}`}>{PLUGIN_STYLE.label}</span>
             {plugin.version && (
-              <span className="font-mono text-[10.5px] text-foreground/40">{plugin.version}</span>
+              <span className="font-mono text-[10.5px] text-fg-fade-40">{plugin.version}</span>
             )}
             <ProvenanceBadge provenance={provenance} />
           </button>
           <button
             onClick={() => setOpen((v) => !v)}
             disabled={total === 0}
-            className="mt-0.5 flex items-center gap-1 text-[11px] text-foreground/50 hover:text-foreground/80 disabled:cursor-default disabled:hover:text-foreground/50"
+            className="mt-0.5 flex items-center gap-1 text-[11px] text-fg-fade-50 hover:text-fg-fade-80 disabled:cursor-default disabled:hover:text-fg-fade-50"
           >
             {summarizeComponents(components)}
             {total > 0 && (
@@ -274,7 +274,7 @@ export function PluginRow({
           </button>
         </div>
         {inherited ? (
-          <span className="text-[10.5px] italic text-foreground/35">managed upstream</span>
+          <span className="text-[10.5px] italic text-fg-fade-35">managed upstream</span>
         ) : (
           <>
             <BusyToggle
@@ -297,7 +297,7 @@ export function PluginRow({
               if (items.length === 0) return null;
               return (
                 <div key={key} className="space-y-1">
-                  <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-foreground/35">
+                  <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-fg-fade-35">
                     {label}
                   </div>
                   {items.map((c) => (

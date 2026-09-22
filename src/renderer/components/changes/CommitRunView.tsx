@@ -47,7 +47,7 @@ export function CommitRunView({
           <HookItem key={`${h.name}-${i}`} hook={h} />
         ))}
         {state.raw && (
-          <pre className="mt-2 mx-2 p-2 rounded bg-[hsl(var(--surface-0))] text-[11px] font-mono text-foreground/80 whitespace-pre-wrap wrap-break-word">
+          <pre className="mt-2 mx-2 p-2 rounded bg-[hsl(var(--surface-0))] text-[11px] font-mono text-fg-fade-80 whitespace-pre-wrap wrap-break-word">
             {state.raw}
           </pre>
         )}
@@ -120,7 +120,7 @@ function Header({ state, onCancel }: { state: CommitRunViewProps['state']; onCan
       {isRunning && (
         <button
           onClick={onCancel}
-          className="px-2.5 py-1 text-[11px] rounded border border-border/40 bg-[hsl(var(--surface-2))] text-foreground/80 hover:bg-[hsl(var(--destructive)/0.16)] hover:border-[hsl(var(--destructive)/0.4)] hover:text-destructive inline-flex items-center gap-1"
+          className="px-2.5 py-1 text-[11px] rounded border border-border/40 bg-[hsl(var(--surface-2))] text-fg-fade-80 hover:bg-[hsl(var(--destructive)/0.16)] hover:border-[hsl(var(--destructive)/0.4)] hover:text-destructive inline-flex items-center gap-1"
         >
           <X size={11} strokeWidth={2.5} />
           Cancel
@@ -167,12 +167,12 @@ function HookItem({ hook }: { hook: HookRecord }) {
           <ChevronRight
             size={12}
             strokeWidth={2}
-            className={`text-muted-foreground/60 transition-transform ${open ? 'rotate-90' : ''}`}
+            className={`text-muted-fade-60 transition-transform ${open ? 'rotate-90' : ''}`}
           />
         )}
       </button>
       {open && expandable && (
-        <div className="bg-[hsl(var(--surface-0))] border-t border-border/40 px-3.5 py-2.5 max-h-60 overflow-y-auto text-[11px] font-mono leading-relaxed whitespace-pre-wrap text-foreground/85">
+        <div className="bg-[hsl(var(--surface-0))] border-t border-border/40 px-3.5 py-2.5 max-h-60 overflow-y-auto text-[11px] font-mono leading-relaxed whitespace-pre-wrap text-fg-fade-85">
           {hook.modifiedFiles && (
             <div className="text-[hsl(var(--warn))] mb-1">files were modified by this hook</div>
           )}
@@ -208,7 +208,7 @@ function Footer({
         {secondary && (
           <button
             onClick={secondary.onClick}
-            className={`${primary ? 'px-3.5' : 'flex-1'} h-8 inline-flex items-center justify-center gap-1.5 bg-[hsl(var(--surface-2))] border border-border/40 text-foreground/80 rounded-md text-[12px] hover:bg-[hsl(var(--surface-3))]`}
+            className={`${primary ? 'px-3.5' : 'flex-1'} h-8 inline-flex items-center justify-center gap-1.5 bg-[hsl(var(--surface-2))] border border-border/40 text-fg-fade-80 rounded-md text-[12px] hover:bg-[hsl(var(--surface-3))]`}
           >
             {secondary.icon}
             {secondary.label}

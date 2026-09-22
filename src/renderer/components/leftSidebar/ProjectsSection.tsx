@@ -221,13 +221,13 @@ export function ProjectsSection({
   return (
     <div className="flex-1 min-h-0 flex flex-col mr-[5px]">
       <div className="flex items-center justify-between pl-4 pr-1.5 pt-1.5 pb-1">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70 select-none">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-fade-70 select-none">
           Projects
         </span>
         <Tooltip content="Create project">
           <button
             onClick={onOpenFolder}
-            className="p-[3px] rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors titlebar-no-drag"
+            className="p-[3px] rounded text-muted-fade-60 hover:text-foreground hover:bg-foreground/5 transition-colors titlebar-no-drag"
           >
             <Plus size={13} strokeWidth={2} />
           </button>
@@ -236,7 +236,7 @@ export function ProjectsSection({
       <div className="scrollbar-thin-hover flex-1 min-h-0 overflow-y-auto pl-2 pb-2">
         {projects.length === 0 && (
           <div className="px-2 py-10 text-center">
-            <p className="text-[13px] text-muted-foreground/40 leading-relaxed">
+            <p className="text-[13px] text-muted-fade-40 leading-relaxed">
               Open a folder to get started
             </p>
           </div>
@@ -304,7 +304,7 @@ export function ProjectsSection({
                       toggleCollapse(project.id);
                     }}
                     className={`p-0.5 rounded shrink-0 hover:text-foreground transition-colors ${
-                      isProjectCollapsed ? 'text-muted-foreground/60' : ''
+                      isProjectCollapsed ? 'text-muted-fade-60' : ''
                     }`}
                   >
                     {isProjectCollapsed ? (
@@ -320,7 +320,7 @@ export function ProjectsSection({
                       const nameSpan = (
                         <span
                           className={`truncate flex-1 min-w-0 ${
-                            isProjectCollapsed && !hasActiveTask ? 'opacity-50' : ''
+                            isProjectCollapsed && !hasActiveTask ? 'fade-50' : ''
                           }`}
                         >
                           {project.name}
@@ -361,7 +361,7 @@ export function ProjectsSection({
                             {projectTasks.length > 0 && (
                               <span
                                 className={`text-xs text-muted-foreground tabular-nums shrink-0 mr-0.5 leading-none ${
-                                  isProjectCollapsed ? 'opacity-50' : ''
+                                  isProjectCollapsed ? 'fade-50' : ''
                                 }`}
                               >
                                 {projectTasks.length}
@@ -466,7 +466,7 @@ export function ProjectsSection({
 
                       {projectTasks.length === 0 && isActive && (
                         <div className="px-2 py-3 text-center">
-                          <p className="text-[10px] text-muted-foreground/60">No tasks yet</p>
+                          <p className="text-[10px] text-muted-fade-60">No tasks yet</p>
                         </div>
                       )}
 
@@ -499,7 +499,7 @@ export function ProjectsSection({
                                 {archivedTasks.map((task) => (
                                   <div
                                     key={task.id}
-                                    className="group/archived flex items-center gap-2 pl-3.5 pr-2 py-[6px] rounded-md text-[13px] text-muted-foreground/50"
+                                    className="group/archived flex items-center gap-2 pl-3.5 pr-2 py-[6px] rounded-md text-[13px] text-muted-fade-50"
                                   >
                                     <span className="truncate flex-1 min-w-0">{task.name}</span>
                                     <div className="hidden group-hover/archived:flex gap-0.5 shrink-0">

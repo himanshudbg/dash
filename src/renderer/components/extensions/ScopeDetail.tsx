@@ -32,7 +32,7 @@ const SCOPE_META: Record<
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-foreground/75">
+    <h3 className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-fg-fade-75">
       {children}
     </h3>
   );
@@ -49,7 +49,7 @@ export function ScopeDetail({ scope, ext }: { scope?: ScopeExtensions; ext: Ext 
 
   if (!scope) {
     return (
-      <div className="flex flex-1 items-center justify-center text-[12px] text-foreground/40">
+      <div className="flex flex-1 items-center justify-center text-[12px] text-fg-fade-40">
         Select a scope.
       </div>
     );
@@ -154,10 +154,10 @@ export function ScopeDetail({ scope, ext }: { scope?: ScopeExtensions; ext: Ext 
   return (
     <div key={s.id} className="min-h-0 flex-1 overflow-y-auto p-5 animate-fade-in">
       <div className="mb-4 flex items-center gap-2.5">
-        <span className="text-foreground/70">{meta.icon}</span>
+        <span className="text-fg-fade-70">{meta.icon}</span>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold leading-tight text-foreground">{s.name}</div>
-          <div className="font-mono text-[10.5px] text-foreground/40">{meta.note}</div>
+          <div className="font-mono text-[10.5px] text-fg-fade-40">{meta.note}</div>
         </div>
       </div>
 
@@ -166,11 +166,11 @@ export function ScopeDetail({ scope, ext }: { scope?: ScopeExtensions; ext: Ext 
           className="flex flex-col items-center gap-2 rounded-[13px] px-6 py-12 text-center shadow-[inset_0_1px_2px_hsl(0_0%_0%/0.2)]"
           style={{ background: 'hsl(var(--surface-0))' }}
         >
-          <PackageOpen size={22} strokeWidth={1.6} className="text-foreground/30" />
-          <div className="text-[12.5px] text-foreground/70">Nothing here or inherited yet</div>
-          <div className="max-w-[280px] text-[11px] leading-relaxed text-foreground/45">
-            Switch to <span className="font-medium text-foreground/65">Browse</span> to add a skill
-            or plugin to {s.kind === 'global' ? 'every project' : s.name}.
+          <PackageOpen size={22} strokeWidth={1.6} className="text-fg-fade-30" />
+          <div className="text-[12.5px] text-fg-fade-70">Nothing here or inherited yet</div>
+          <div className="max-w-[280px] text-[11px] leading-relaxed text-fg-fade-45">
+            Switch to <span className="font-medium text-fg-fade-65">Browse</span> to add a skill or
+            plugin to {s.kind === 'global' ? 'every project' : s.name}.
           </div>
         </div>
       ) : (
