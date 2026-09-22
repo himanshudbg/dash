@@ -217,13 +217,23 @@ describe('projectsStore archive/restore/close/update', () => {
     expect(api.restoreTask).toHaveBeenCalledWith('t1');
   });
 
-  it('closeTask kills pty, clears snapshot, and clears active task if it was active', async () => {
+  it('closeTask stops the supervisor session (not just the pty), clears snapshot, and clears active task if it was active', async () => {
     const useProjects = await freshStore();
     useProjects.getState().setActiveTask('t1');
-    useProjects.getState().closeTask('t1');
-    expect(api.ptyKill).toHaveBeenCalledWith('t1');
+    await useProjects.getState().closeTask('t1');
+    // A bare ptyKill only detaches the attach client; sleeping means `claude stop`.
+    expect(api.ptyStopSession).toHaveBeenCalledWith('t1');
+    expect(api.ptyKill).not.toHaveBeenCalled();
     expect(api.ptyClearSnapshot).toHaveBeenCalledWith('t1');
     expect(useProjects.getState().activeTaskId).toBeNull();
+  });
+
+  it('closeTask surfaces a failed stop as a toast', async () => {
+    const useProjects = await freshStore();
+    api.ptyStopSession.mockResolvedValueOnce({ success: false, error: 'claude stop failed' });
+    await useProjects.getState().closeTask('t1');
+    const { toast } = await import('sonner');
+    expect(toast.error).toHaveBeenCalledWith('claude stop failed');
   });
 
   it('updateTask saves, reloads, and returns the updated task', async () => {

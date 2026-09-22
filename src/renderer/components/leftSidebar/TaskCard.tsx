@@ -148,16 +148,20 @@ export function TaskCard({
         {prInfo && <PrBadge prInfo={prInfo} variant="icon" />}
 
         {/* Right slot: context percentage at rest, the action row on hover
-            (or while its menu is open), each sliding over the other. The percentage lives inside the slot (not before it) so no
-            flex gap pushes it left; `-mr-0.5` lands its right edge where the
-            project rows put their task count. */}
+            (or while its menu is open), each sliding over the other. The
+            percentage lives inside the slot (not before it) so no flex gap
+            pushes it left. `-mr-0.5` on the clipping wrapper (not the span:
+            a negative margin inside an overflow-hidden box would clip the
+            glyph) lands its right edge where the project rows put their task
+            count, while the grid track — and so the actions' start — stays
+            where it was. */}
         <div className="flex items-center shrink-0">
           <div
             className={`grid transition-[grid-template-columns,opacity] duration-200 ease-out ${tuckCls}`}
           >
-            <div className="overflow-hidden min-w-0 flex items-center">
+            <div className="overflow-hidden min-w-0 -mr-0.5 flex items-center">
               {percentVisible && (
-                <span className="text-[11px] tabular-nums shrink-0 -mr-0.5 text-muted-foreground">
+                <span className="text-[11px] tabular-nums shrink-0 text-muted-foreground">
                   {Math.round(ctx!.percentage)}%
                 </span>
               )}
@@ -168,7 +172,7 @@ export function TaskCard({
           >
             <div className="overflow-hidden min-w-0">
               <TaskActions
-                hasActiveSession={!!activityState}
+                activityState={activityState}
                 onOpenIde={onOpenIde}
                 onClose={onClose}
                 onSettings={onSettings}

@@ -129,10 +129,15 @@ class ActivityMonitorImpl {
    */
   applySupervisor(ptyId: string, activity: SupervisorActivity, pollIntervalMs: number): void {
     let a = this.activities.get(ptyId);
+    // A row the listing created is news to the renderer even when its state
+    // matches the fresh default (`idle`): without an emit the sidebar shows no
+    // dot — and no "Put to sleep" button — for that task until something changes.
+    let created = false;
     if (!a) {
       a = this.fresh(0);
       a.lastHookTime = 0;
       this.activities.set(ptyId, a);
+      created = true;
     }
     const now = Date.now();
     a.lastSupervisorTime = now;
@@ -151,6 +156,7 @@ class ActivityMonitorImpl {
     const nextError = next === 'error' ? (activity.error ?? a.error) : null;
     const nextDetail = activity.detail ?? null;
     const changed =
+      created ||
       a.state !== next ||
       a.detail !== nextDetail ||
       (a.error?.type ?? null) !== (nextError?.type ?? null) ||

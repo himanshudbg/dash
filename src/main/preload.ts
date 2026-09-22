@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('pty:resize', args),
   ptyKill: (id: string) => ipcRenderer.send('pty:kill', id),
   ptyKillAwait: (id: string) => ipcRenderer.invoke('pty:kill-await', id),
+  ptyStopSession: (taskId: string) => ipcRenderer.invoke('pty:stopSession', taskId),
   ptyRestartSession: (taskId: string) => ipcRenderer.invoke('pty:restartSession', taskId),
   ptyListForTask: (
     taskId: string,

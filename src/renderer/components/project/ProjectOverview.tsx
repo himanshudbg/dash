@@ -416,7 +416,7 @@ export function ProjectOverview({
                         }`}
                       >
                         <TaskActions
-                          hasActiveSession={!!activity?.state}
+                          activityState={activity?.state}
                           onOpenIde={() => void openInIde(task.path || project.path)}
                           onClose={() => onCloseTask(task.id)}
                           onSettings={() => onTaskSettings(task.id)}

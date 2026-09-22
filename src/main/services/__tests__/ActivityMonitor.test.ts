@@ -240,6 +240,22 @@ describe('ActivityMonitor — supervisor reconcile (applySupervisor)', () => {
     expect(activityMonitor.getAll()['t1']!.state).toBe('busy');
   });
 
+  it('pushes a newly created entry to the renderer even when its state is the idle default', () => {
+    // A task whose session is already idle when the listing first registers
+    // it would otherwise never reach the renderer — no dot, no sleep button —
+    // until its state changed (the renderer's initial fetch may predate it).
+    activityMonitor.applySupervisor('t1', { state: 'idle' }, POLL);
+    expect(mockSender.send).toHaveBeenCalledWith(
+      'pty:activity',
+      expect.objectContaining({ t1: expect.objectContaining({ state: 'idle' }) }),
+    );
+
+    // Unchanged on the next poll: no redundant push.
+    mockSender.send.mockClear();
+    activityMonitor.applySupervisor('t1', { state: 'idle' }, POLL);
+    expect(mockSender.send).not.toHaveBeenCalled();
+  });
+
   it('keeps a fresh hook-driven busy/idle reading for one poll interval', () => {
     activityMonitor.register('t1', 1);
     activityMonitor.setToolStart('t1', 'Bash', { command: 'ls' });

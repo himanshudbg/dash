@@ -61,7 +61,7 @@ export interface ProjectsActions {
   commitTaskReorder: (projectId: string, reordered: Task[]) => Promise<void>;
   archiveTask: (id: string) => Promise<void>;
   restoreTask: (id: string) => Promise<void>;
-  closeTask: (id: string) => void;
+  closeTask: (id: string) => Promise<void>;
   updateTask: (taskItem: Task, patch: Partial<Task>) => Promise<Task | null>;
   deleteTask: (
     taskItem: Task,
@@ -205,11 +205,14 @@ export const useProjects = create<ProjectsStore>((set) => ({
     await window.electronAPI.restoreTask(id);
     await reloadOwningProject(id);
   },
-  closeTask: (id) => {
+  closeTask: async (id) => {
     disposeTaskSessions(id);
-    void window.electronAPI.ptyKill(id);
     void window.electronAPI.ptyClearSnapshot(id);
     if (useProjects.getState().activeTaskId === id) useProjects.getState().setActiveTask(null);
+    // "Put to sleep" = `claude stop` under the supervisor. A bare ptyKill only
+    // detaches the attach client and leaves the session running.
+    const resp = await window.electronAPI.ptyStopSession(id);
+    if (!resp.success) toast.error(resp.error || 'Failed to put task to sleep');
   },
   updateTask: async (taskItem, patch) => {
     const resp = await window.electronAPI.saveTask({

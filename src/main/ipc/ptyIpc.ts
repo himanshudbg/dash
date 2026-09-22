@@ -15,6 +15,7 @@ import {
   listForTask,
   setInitialPrompt,
   restartTaskSession,
+  stopTaskSession,
   type PtyKind,
 } from '../services/ptyManager';
 import { DatabaseService } from '../services/DatabaseService';
@@ -144,6 +145,20 @@ export function registerPtyIpc(): void {
     try {
       parseArgs('pty:kill-await', z.string(), id);
       await killPtyAwait(id);
+      return { success: true };
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
+
+  // Put the task to sleep: `claude stop` its supervisor job (the attach
+  // client goes with it). Killing the agent PTY alone only detaches the
+  // client — the session keeps running — so the renderer's "Put to sleep"
+  // path calls this instead of pty:kill.
+  ipcMain.handle('pty:stopSession', async (_event, taskId: string) => {
+    try {
+      parseArgs('pty:stopSession', z.string(), taskId);
+      await stopTaskSession(taskId);
       return { success: true };
     } catch (error) {
       return errorResponse(error);

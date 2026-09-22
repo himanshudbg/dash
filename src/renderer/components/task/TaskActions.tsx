@@ -1,4 +1,5 @@
 import { Code2, Power, Settings, Archive, Trash2, MoreHorizontal } from 'lucide-react';
+import type { ActivityState } from '../../../shared/types';
 import { IconButton } from '../ui/IconButton';
 import {
   DropdownMenu,
@@ -9,8 +10,10 @@ import {
 } from '../ui/DropdownMenu';
 
 interface TaskActionsProps {
-  /** Show the "Put to sleep" (power) button only when the task has a live session. */
-  hasActiveSession: boolean;
+  /** The task's activity state; the "Put to sleep" (power) button shows only
+   *  while there is a live session — not for a task with none, nor for one
+   *  already sleeping (`stopped`), where the button would be a no-op. */
+  activityState?: ActivityState;
   onOpenIde: () => void;
   onClose: () => void;
   onSettings: () => void;
@@ -28,8 +31,13 @@ interface TaskActionsProps {
  * stops propagation so it never triggers the card's own select handler.
  * Parents own the positioning and hover-reveal; this renders just the row.
  */
+/** A session the power button can put to sleep: present and not already asleep. */
+export function hasLiveSession(state: ActivityState | undefined): boolean {
+  return !!state && state !== 'stopped';
+}
+
 export function TaskActions({
-  hasActiveSession,
+  activityState,
   onOpenIde,
   onClose,
   onSettings,
@@ -39,7 +47,7 @@ export function TaskActions({
 }: TaskActionsProps) {
   return (
     <div className="flex items-center gap-0.5">
-      {hasActiveSession && (
+      {hasLiveSession(activityState) && (
         <IconButton
           onClick={(e) => {
             e.stopPropagation();

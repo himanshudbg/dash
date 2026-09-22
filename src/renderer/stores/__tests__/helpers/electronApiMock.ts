@@ -67,6 +67,7 @@ export function makeElectronApiMock(overrides: Record<string, unknown> = {}) {
     autoUpdateQuitAndInstall: vi.fn(() => ok(undefined)),
     onAutoUpdateStatus: vi.fn((_cb: (s: unknown) => void) => () => {}),
     ptyKill: vi.fn(),
+    ptyStopSession: vi.fn(() => ok(undefined)),
     ptyClearSnapshot: vi.fn(),
     sessionList: vi.fn(() => ok([])),
     onSessionList: vi.fn((_cb: (rows: unknown) => void) => () => {}),
