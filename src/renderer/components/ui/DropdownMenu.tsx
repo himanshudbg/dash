@@ -14,7 +14,7 @@ export const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       align={align}
-      className={`z-50 min-w-40 rounded-lg border border-border/60 p-1 shadow-xl shadow-black/30 outline-hidden animate-popover-in ${className}`}
+      className={`z-50 min-w-40 rounded-lg border border-border/60 p-1 shadow-xl shadow-shade/30 outline-hidden animate-popover-in ${className}`}
       style={{
         background: 'hsl(var(--popover))',
         color: 'hsl(var(--popover-foreground))',

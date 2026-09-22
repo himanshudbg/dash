@@ -10,6 +10,8 @@ import type { DragHandlers } from '../../hooks/useDragReorder';
 import { useSettings } from '../../stores/settingsStore';
 
 interface TaskCardProps {
+  /** Registers the row with the tree's sliding selection pill. */
+  rowRef?: (el: HTMLDivElement | null) => void;
   task: Task;
   isActive: boolean;
   activityInfo?: ActivityInfo;
@@ -30,6 +32,7 @@ interface TaskCardProps {
 
 /** A single task row in the project tree (expanded sidebar). */
 export function TaskCard({
+  rowRef,
   task,
   isActive,
   activityInfo,
@@ -108,11 +111,10 @@ export function TaskCard({
 
   return (
     <div
+      ref={rowRef}
       draggable
       {...dragHandlers}
-      className={`group/task task-row-pill ${
-        isActive ? 'is-active' : ''
-      } grid grid-cols-[14px_minmax(0,1fr)] -ml-2 pl-2 pr-2 py-[3px] rounded-md text-[13px] cursor-pointer transition-[transform,color] duration-200 ease-out ${
+      className={`group/task grid grid-cols-[14px_minmax(0,1fr)] -ml-2 pl-2 pr-2 py-[3px] rounded-md text-[13px] cursor-pointer transition-[transform,color] duration-200 ease-out ${
         isActive
           ? 'text-foreground font-medium scale-[1.035]'
           : 'sidebar-row-hover text-muted-foreground hover:text-foreground'

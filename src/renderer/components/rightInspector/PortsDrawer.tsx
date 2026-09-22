@@ -36,7 +36,7 @@ export function PortsDrawer({ taskId, state, collapsed, onCollapse, onExpand }: 
       {collapsed ? (
         <button
           onClick={onExpand}
-          className="h-full w-full flex items-center gap-2 px-4 text-foreground/80 hover:text-foreground transition-colors border-t border-white/8 hover:bg-white/4"
+          className="h-full w-full flex items-center gap-2 px-4 text-foreground/80 hover:text-foreground transition-colors border-t border-edge/8 hover:bg-edge/4"
         >
           <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">{LABEL}</span>
           <span className="text-[10.5px] tabular-nums text-muted-foreground/80">{status}</span>
@@ -47,7 +47,7 @@ export function PortsDrawer({ taskId, state, collapsed, onCollapse, onExpand }: 
           <ChevronUp size={12} strokeWidth={1.8} className="ml-auto" />
         </button>
       ) : (
-        <div className="ports-header flex items-center h-10 shrink-0 border-t border-white/8">
+        <div className="ports-header flex items-center h-10 shrink-0 border-t border-edge/8">
           <span className="ports-label ml-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
             {LABEL}
           </span>

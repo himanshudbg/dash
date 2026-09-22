@@ -32,6 +32,13 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  /* Glass chrome as utilities: `bg-scrim`, `border-edge/8` (was white/8),
+     `shadow-shade/30` (was black/30). The /N modifier scales the theme's
+     strength, so dark renders exactly as the old white/black utilities. */
+  --color-scrim: hsl(var(--scrim));
+  --color-edge: hsl(var(--glass-edge) / var(--glass-edge-k));
+  --color-shade: hsl(var(--glass-shade) / var(--glass-shade-k));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -72,6 +79,21 @@
     --surface-3: 38 30% 88%; /* #ece6d5 */
 
     --shadow-card: 0 1px 0 hsl(0 0% 100% / 0.6), 0 8px 22px hsl(36 11% 10% / 0.12);
+
+    /* Glass chrome (sidebar, inspector, modals, toasts, menus). Each role is an
+       HSL colour plus a strength `-k`: call sites write their dark-tuned alpha
+       as `calc(<alpha> * var(--glass-*-k))`, so dark (k = 1) stays exact and
+       light rescales it. Light needs brighter sheens, and ink-tinted rather
+       than white edges and much softer shadows. */
+    --glass-light: 0 0% 100%; /* sheen + top highlight */
+    --glass-light-k: 4;
+    --glass-edge: 36 11% 10%; /* outlines, hairlines, drawer borders */
+    --glass-edge-k: 0.8;
+    --glass-shade: 36 11% 10%; /* drop shadows + bottom lowlight */
+    --glass-shade-k: 0.3;
+    --glass-fill-k: 1.3; /* opacity of the frosted surface fill */
+    --glass-base: 0.6; /* solid paper under the fill, so the top sheen isn't see-through */
+    --scrim: 36 11% 10% / 0.22; /* modal backdrop */
 
     --warn: 38 92% 50%; /* bright amber */
     --warn-foreground: 0 0% 100%;
@@ -150,6 +172,17 @@
     --surface-3: 240 8% 15%; /* #24242c */
 
     --shadow-card: 0 1px 0 hsl(0 0% 100% / 0.04), 0 12px 28px hsl(0 0% 0% / 0.45);
+
+    /* Glass chrome — see the light-theme note. k = 1: alphas as written. */
+    --glass-light: 0 0% 100%;
+    --glass-light-k: 1;
+    --glass-edge: 0 0% 100%;
+    --glass-edge-k: 1;
+    --glass-shade: 0 0% 0%;
+    --glass-shade-k: 1;
+    --glass-fill-k: 1;
+    --glass-base: 0;
+    --scrim: 0 0% 0% / 0.55;
 
     --warn: 42 95% 60%; /* bright amber for usage warn tier */
     --warn-foreground: 240 10% 5%;
@@ -757,19 +790,31 @@
 
 /* ── Sidebar atmosphere (A1 · Soft Pill) ─────────────────── */
 
-.sidebar-shell {
+/* Shared frosted fill + edge light for the glass chrome. Alphas are the dark
+   values; the --glass-*-k strengths rescale them for light (see :root). */
+.sidebar-shell,
+.right-inspector-shell,
+.modal-shell {
   position: relative;
-  background: linear-gradient(
-    180deg,
-    hsl(0 0% 100% / 0.1) 0%,
-    hsl(var(--surface-2) / 0.5) 40%,
-    hsl(var(--surface-1) / 0.72) 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      hsl(var(--glass-light) / calc(0.1 * var(--glass-light-k))) 0%,
+      hsl(var(--surface-2) / calc(0.5 * var(--glass-fill-k))) 40%,
+      hsl(var(--surface-1) / calc(0.72 * var(--glass-fill-k))) 100%
+    ),
+    hsl(var(--surface-1) / var(--glass-base));
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.18),
-    inset 0 -1px 0 0 hsl(0 0% 0% / 0.22);
+  --glass-edges:
+    inset 0 1px 0 0 hsl(var(--glass-light) / calc(0.18 * var(--glass-light-k))),
+    inset 0 -1px 0 0 hsl(var(--glass-shade) / calc(0.22 * var(--glass-shade-k)));
+  box-shadow: var(--glass-edges);
+}
+.right-inspector-shell,
+.modal-shell {
+  outline: 1px solid hsl(var(--glass-edge) / calc(0.1 * var(--glass-edge-k)));
+  outline-offset: -1px;
 }
 .sidebar-shell::before {
   content: '';
@@ -779,8 +824,8 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(0 0% 100% / 0.1) 30%,
-    hsl(0 0% 100% / 0.1) 70%,
+    hsl(var(--glass-light) / calc(0.1 * var(--glass-light-k))) 30%,
+    hsl(var(--glass-light) / calc(0.1 * var(--glass-light-k))) 70%,
     transparent
   );
   pointer-events: none;
@@ -789,21 +834,9 @@
 /* ── Right inspector glass card ──────────────────────────── */
 
 .right-inspector-shell {
-  position: relative;
-  background: linear-gradient(
-    180deg,
-    hsl(0 0% 100% / 0.1) 0%,
-    hsl(var(--surface-2) / 0.5) 40%,
-    hsl(var(--surface-1) / 0.72) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
   box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.18),
-    inset 0 -1px 0 0 hsl(0 0% 0% / 0.22),
-    0 20px 40px -20px hsl(0 0% 0% / 0.5);
-  outline: 1px solid hsl(0 0% 100% / 0.1);
-  outline-offset: -1px;
+    var(--glass-edges),
+    0 20px 40px -20px hsl(var(--glass-shade) / calc(0.5 * var(--glass-shade-k)));
 }
 
 /* Legacy: flat side panels — old Dash had no gradient here. Remove to restore. */
@@ -823,21 +856,9 @@
    read as the same surface family, just floating. A deeper drop shadow lifts
    the centered card off the dimmed backdrop. */
 .modal-shell {
-  position: relative;
-  background: linear-gradient(
-    180deg,
-    hsl(0 0% 100% / 0.1) 0%,
-    hsl(var(--surface-2) / 0.5) 40%,
-    hsl(var(--surface-1) / 0.72) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
   box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.18),
-    inset 0 -1px 0 0 hsl(0 0% 0% / 0.22),
-    0 24px 60px -20px hsl(0 0% 0% / 0.6);
-  outline: 1px solid hsl(0 0% 100% / 0.1);
-  outline-offset: -1px;
+    var(--glass-edges),
+    0 24px 60px -20px hsl(var(--glass-shade) / calc(0.6 * var(--glass-shade-k)));
 }
 
 /* Soft horizontal hairline used inside the inspector to separate sections
@@ -848,8 +869,8 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(0 0% 100% / 0.1) 30%,
-    hsl(0 0% 100% / 0.1) 70%,
+    hsl(var(--glass-edge) / calc(0.1 * var(--glass-edge-k))) 30%,
+    hsl(var(--glass-edge) / calc(0.1 * var(--glass-edge-k))) 70%,
     transparent
   );
   pointer-events: none;
@@ -867,8 +888,8 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(0 0% 100% / 0.1) 30%,
-    hsl(0 0% 100% / 0.1) 70%,
+    hsl(var(--glass-edge) / calc(0.1 * var(--glass-edge-k))) 30%,
+    hsl(var(--glass-edge) / calc(0.1 * var(--glass-edge-k))) 70%,
     transparent
   );
   pointer-events: none;
@@ -885,30 +906,6 @@
 
 .sidebar-pill-active {
   background: linear-gradient(180deg, hsl(var(--primary) / 0.14), hsl(var(--primary) / 0.08));
-}
-
-/* Task row "pill" — same gradient as .sidebar-pill-active, but the alpha is
-   driven by a custom property so the active state can transition smoothly
-   without resorting to an absolutely-positioned overlay (which gets clipped
-   by the row's grid layout). */
-@property --pill-opacity {
-  syntax: '<number>';
-  inherits: false;
-  initial-value: 0;
-}
-.task-row-pill {
-  --pill-opacity: 0;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--primary) / calc(0.14 * var(--pill-opacity))),
-    hsl(var(--primary) / calc(0.08 * var(--pill-opacity)))
-  );
-  transition:
-    --pill-opacity 200ms ease,
-    color 200ms ease;
-}
-.task-row-pill.is-active {
-  --pill-opacity: 1;
 }
 
 .sidebar-row-hover:hover {
@@ -972,14 +969,6 @@
     0 0 0 4px hsl(var(--ring) / 0.4);
 }
 
-/* ── Backdrop ─────────────────────────────────────────────── */
-
-.modal-backdrop {
-  background: hsl(0 0% 4% / 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
 /* ── Diff Colors ──────────────────────────────────────────── */
 
 .diff-add {
@@ -1030,7 +1019,7 @@
   color: hsl(var(--foreground));
   background: hsl(var(--surface-3));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.15);
+  box-shadow: 0 2px 8px hsl(var(--glass-shade) / calc(0.15 * var(--glass-shade-k)));
   animation: tooltip-in 120ms ease-out;
 }
 
@@ -1230,7 +1219,7 @@
   border: 1px solid hsl(var(--border) / 0.5);
   background-color: hsl(var(--surface-3) / 0.45);
   backdrop-filter: blur(8px);
-  box-shadow: 0 4px 14px hsl(0 0% 0% / 0.18);
+  box-shadow: 0 4px 14px hsl(var(--glass-shade) / calc(0.18 * var(--glass-shade-k)));
   /* Interactive so the × is clickable; the hook's grace period keeps it shown
    * while the pointer travels here from the code. */
   pointer-events: auto;
@@ -1259,7 +1248,7 @@
 .monaco-blame-ruler-label:hover {
   background-color: hsl(var(--surface-3) / 0.72);
   border-color: hsl(var(--border) / 0.9);
-  box-shadow: 0 6px 18px hsl(0 0% 0% / 0.26);
+  box-shadow: 0 6px 18px hsl(var(--glass-shade) / calc(0.26 * var(--glass-shade-k)));
 }
 .blame-label-close {
   position: absolute;
@@ -1358,23 +1347,14 @@
  * as "frosted glass on top of the code" rather than a flat panel. */
 .glass-popover {
   background:
-    linear-gradient(180deg, hsl(var(--primary) / 0.04), hsl(var(--primary) / 0)),
-    hsl(var(--surface-2) / 0.55) !important;
+    linear-gradient(180deg, hsl(var(--primary) / 0.05), hsl(var(--primary) / 0)),
+    hsl(var(--surface-2) / calc(0.6 * var(--glass-fill-k))) !important;
   backdrop-filter: blur(24px) saturate(1.6);
   -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  border-color: hsl(var(--border) / 0.4) !important;
+  border-color: hsl(var(--glass-edge) / calc(0.08 * var(--glass-edge-k))) !important;
   box-shadow:
-    0 18px 40px -16px hsl(0 0% 0% / 0.45),
-    inset 0 1px 0 hsl(0 0% 100% / 0.06) !important;
-}
-.dark .glass-popover {
-  background:
-    linear-gradient(180deg, hsl(var(--primary) / 0.05), hsl(var(--primary) / 0)),
-    hsl(var(--surface-2) / 0.6) !important;
-  border-color: hsl(0 0% 100% / 0.08) !important;
-  box-shadow:
-    0 22px 48px -18px hsl(0 0% 0% / 0.65),
-    inset 0 1px 0 hsl(0 0% 100% / 0.08) !important;
+    0 22px 48px -18px hsl(var(--glass-shade) / calc(0.65 * var(--glass-shade-k))),
+    inset 0 1px 0 hsl(var(--glass-light) / calc(0.08 * var(--glass-light-k))) !important;
 }
 /* Breathing room between the code area and the minimap on the right.
  * Monaco renders the minimap as an absolutely-positioned sibling of the
@@ -1419,23 +1399,23 @@
  * variables don't cover. */
 [data-sonner-toaster] {
   --normal-bg: transparent;
-  --normal-border: hsl(0 0% 100% / 0.12);
+  --normal-border: hsl(var(--glass-edge) / calc(0.12 * var(--glass-edge-k)));
   --normal-text: hsl(var(--foreground));
 }
 [data-sonner-toast] {
   background: linear-gradient(
     180deg,
-    hsl(0 0% 100% / 0.08) 0%,
-    hsl(var(--surface-2) / 0.55) 40%,
-    hsl(var(--surface-1) / 0.75) 100%
+    hsl(var(--glass-light) / calc(0.08 * var(--glass-light-k))) 0%,
+    hsl(var(--surface-2) / calc(0.55 * var(--glass-fill-k))) 40%,
+    hsl(var(--surface-1) / calc(0.75 * var(--glass-fill-k))) 100%
   ) !important;
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid hsl(0 0% 100% / 0.12) !important;
+  border: 1px solid hsl(var(--glass-edge) / calc(0.12 * var(--glass-edge-k))) !important;
   box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
-    inset 0 -1px 0 0 hsl(0 0% 0% / 0.18),
-    0 8px 24px hsl(0 0% 0% / 0.25) !important;
+    inset 0 1px 0 0 hsl(var(--glass-light) / calc(0.14 * var(--glass-light-k))),
+    inset 0 -1px 0 0 hsl(var(--glass-shade) / calc(0.18 * var(--glass-shade-k))),
+    0 8px 24px hsl(var(--glass-shade) / calc(0.25 * var(--glass-shade-k))) !important;
   color: hsl(var(--foreground)) !important;
 }
 /* Suppress sonner's slide-in for the second (and later) appearance of the

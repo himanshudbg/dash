@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus,
   Trash2,
@@ -23,6 +23,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { formatTokens, formatCost } from '../../utils/format';
 import { TaskCard } from './TaskCard';
 import { ForeignSessionsSection } from './ForeignSessionsSection';
+import { SlidingPill, useSlidingPill } from './useSlidingPill';
 import { openInIde } from '../../lib/openInIde';
 import { useSettings } from '../../stores/settingsStore';
 import { useRuntime } from '../../stores/runtimeStore';
@@ -175,6 +176,24 @@ export function ProjectsSection({
     },
   );
 
+  // One selection pill for the whole tree: it slides between projects, and
+  // fades out while the selected task's project is collapsed.
+  const activeTaskProjectId = activeTaskId
+    ? Object.keys(tasksByProject).find((pid) =>
+        tasksByProject[pid]?.some((t) => t.id === activeTaskId && !t.archivedAt),
+      )
+    : undefined;
+  const pillHidden = !!activeTaskProjectId && !expandedProjects.has(activeTaskProjectId);
+  const treeLayout = useMemo(
+    () => [projects, tasksByProject, expandedProjects, collapsedArchived],
+    [projects, tasksByProject, expandedProjects, collapsedArchived],
+  );
+  const {
+    containerRef: treeRef,
+    setRow: setTaskRow,
+    pill,
+  } = useSlidingPill(activeTaskId, pillHidden, treeLayout);
+
   function toggleCollapse(projectId: string) {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -223,7 +242,8 @@ export function ProjectsSection({
           </div>
         )}
 
-        <div>
+        <div ref={treeRef} className="relative isolate">
+          <SlidingPill pill={pill} />
           {projects.map((project) => {
             const isActive = project.id === activeProjectId;
             const isProjectCollapsed = !expandedProjects.has(project.id);
@@ -425,6 +445,7 @@ export function ProjectsSection({
                       {projectTasks.map((task) => (
                         <TaskCard
                           key={task.id}
+                          rowRef={(el) => setTaskRow(task.id, el)}
                           task={task}
                           isActive={task.id === activeTaskId}
                           activityInfo={taskActivity[task.id]}

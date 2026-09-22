@@ -108,7 +108,7 @@ export function EditorHeader({
 
   return (
     <div
-      className="flex items-center justify-between px-3 h-9 border-b border-white/6 shrink-0"
+      className="flex items-center justify-between px-3 h-9 border-b border-edge/6 shrink-0"
       style={{ background: backgroundColor }}
     >
       <div className="flex items-center gap-3 min-w-0">

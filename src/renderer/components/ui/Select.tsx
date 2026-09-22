@@ -50,7 +50,7 @@ export function Select<T extends string>({
         <DropdownMenuPrimitive.Content
           align="start"
           sideOffset={4}
-          className={`z-50 min-w-(--radix-dropdown-menu-trigger-width) max-h-[320px] overflow-y-auto p-1 rounded-lg border border-border/60 shadow-xl shadow-black/30 outline-hidden animate-popover-in ${contentClassName}`}
+          className={`z-50 min-w-(--radix-dropdown-menu-trigger-width) max-h-[320px] overflow-y-auto p-1 rounded-lg border border-border/60 shadow-xl shadow-shade/30 outline-hidden animate-popover-in ${contentClassName}`}
           style={{
             background: 'hsl(var(--popover))',
             color: 'hsl(var(--popover-foreground))',

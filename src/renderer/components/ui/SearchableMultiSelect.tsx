@@ -165,7 +165,7 @@ export function SearchableMultiSelect<T>({
         </div>
 
         {dropdownOpen && (
-          <div className="absolute z-50 mt-1 w-full bg-card border border-border/60 rounded-lg shadow-xl shadow-black/30 overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full bg-card border border-border/60 rounded-lg shadow-xl shadow-shade/30 overflow-hidden">
             <div className="max-h-[200px] overflow-y-auto">
               {loading && results.length === 0 ? (
                 <div className="px-3 py-3 text-[12px] text-muted-foreground/40 text-center flex items-center justify-center gap-2">

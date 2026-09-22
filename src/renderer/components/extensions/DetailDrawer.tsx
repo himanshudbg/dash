@@ -117,13 +117,13 @@ export function DetailDrawer({ ext }: { ext: Ext }) {
     <>
       {/* in-modal scrim */}
       <div
-        className={`absolute inset-0 z-20 bg-[hsl(0_0%_0%/0.45)] ${
+        className={`absolute inset-0 z-20 bg-scrim/80 ${
           closing ? 'animate-fade-out' : 'animate-fade-in'
         }`}
         onClick={ext.closeDetail}
       />
       <div
-        className={`absolute inset-y-0 right-0 z-30 flex w-[480px] max-w-[80%] flex-col shadow-[-30px_0_70px_-20px_hsl(0_0%_0%/0.65)] ${
+        className={`absolute inset-y-0 right-0 z-30 flex w-[480px] max-w-[80%] flex-col shadow-[-30px_0_70px_-20px_hsl(var(--glass-shade)/calc(0.65*var(--glass-shade-k)))] ${
           closing ? 'animate-slide-out-right' : 'animate-slide-in-right'
         }`}
         style={{ background: 'hsl(var(--surface-2))' }}

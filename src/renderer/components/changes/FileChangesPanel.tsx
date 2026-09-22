@@ -349,7 +349,7 @@ export function FileChangesPanel({
                       }
                     }}
                     placeholder="Describe the change…"
-                    className="flex-1 min-h-0 w-full text-[12.5px] leading-relaxed bg-foreground/4 border border-white/8 rounded-md px-3 py-2 resize-none placeholder:text-muted-foreground/40 focus:outline-hidden focus:border-primary/40"
+                    className="flex-1 min-h-0 w-full text-[12.5px] leading-relaxed bg-foreground/4 border border-edge/8 rounded-md px-3 py-2 resize-none placeholder:text-muted-foreground/40 focus:outline-hidden focus:border-primary/40"
                   />
                   <CircleCheck
                     checked={allowEmpty}

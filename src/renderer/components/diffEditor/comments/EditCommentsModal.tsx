@@ -86,11 +86,11 @@ function EditCommentsBody({
 
         <div className="flex items-center justify-between gap-3">
           <span className="text-[10.5px] text-muted-foreground/55">
-            <kbd className="font-mono px-1 py-0.5 rounded bg-foreground/6 border border-white/6">
+            <kbd className="font-mono px-1 py-0.5 rounded bg-foreground/6 border border-edge/6">
               ⌘
             </kbd>
             <span className="mx-0.5">+</span>
-            <kbd className="font-mono px-1 py-0.5 rounded bg-foreground/6 border border-white/6">
+            <kbd className="font-mono px-1 py-0.5 rounded bg-foreground/6 border border-edge/6">
               ↵
             </kbd>
             <span className="ml-1.5">to send</span>

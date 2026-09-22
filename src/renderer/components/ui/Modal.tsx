@@ -101,11 +101,10 @@ export function Modal({
 
   return (
     <ModalCloseContext.Provider value={requestClose}>
-      {/* Local backdrop instead of the shared `modal-backdrop` class: a slightly
-          softer dim + blur lets the underlying app peek through the translucent
-          card without dominating it. */}
+      {/* A soft dim + blur lets the underlying app peek through the translucent
+          card without dominating it. `bg-scrim` is dark ink in the light theme. */}
       <div
-        className={`fixed inset-0 ${elevated ? 'z-[60]' : 'z-50'} flex items-center justify-center bg-[hsl(0_0%_0%/0.55)] backdrop-blur-md ${closing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        className={`fixed inset-0 ${elevated ? 'z-[60]' : 'z-50'} flex items-center justify-center bg-scrim backdrop-blur-md ${closing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onMouseDown={(e) => {
           mouseDownOnBackdrop.current = e.target === e.currentTarget;
         }}

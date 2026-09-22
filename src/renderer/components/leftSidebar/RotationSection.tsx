@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import { IconButton } from '../ui/IconButton';
@@ -6,9 +6,10 @@ import { Tooltip } from '../ui/Tooltip';
 import { MainRepoBadge } from '../ui/MainRepoBadge';
 import { useRuntime } from '../../stores/runtimeStore';
 import { useSettings } from '../../stores/settingsStore';
+import { SlidingPill, useSlidingPill } from './useSlidingPill';
 import type { Project, Task, ContextUsage } from '../../../shared/types';
 
-/* ── Rotation (Active Tasks) with sliding highlight ──────── */
+/* ── Rotation (Active Tasks) with a sliding selection pill ── */
 
 type RotationRow = { task: Task; phase: 'entering' | 'present' | 'leaving' };
 const ROTATION_EXIT_MS = 320;
@@ -34,10 +35,6 @@ export function RotationSection({
 }) {
   const taskActivity = useRuntime((s) => s.taskActivity);
   const showPercent = useSettings((s) => s.showContextUsageOnTaskCards);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [highlight, setHighlight] = useState<{ top: number; height: number } | null>(null);
-  const hasAnimated = useRef(false);
   const rotationOnReorder = useCallback(
     (_gId: string | undefined, reordered: Task[]) => onReorderRotation?.(reordered),
     [onReorderRotation],
@@ -95,59 +92,9 @@ export function RotationSection({
     return () => clearTimeout(id);
   }, [rows]);
 
-  const setRowRef = useCallback((taskId: string, el: HTMLDivElement | null) => {
-    if (el) rowRefs.current.set(taskId, el);
-    else rowRefs.current.delete(taskId);
-  }, []);
-
-  const measureHighlight = useCallback(() => {
-    if (!activeTaskId || !containerRef.current) {
-      setHighlight(null);
-      return;
-    }
-    const row = rowRefs.current.get(activeTaskId);
-    if (!row) {
-      setHighlight(null);
-      return;
-    }
-    // Use offsetTop/offsetHeight (transform-agnostic) instead of
-    // getBoundingClientRect — rows have an entry/exit motion animation and
-    // the bounding rect captures the in-flight transform, which would place
-    // the pill below its resting position until a later re-render corrects it.
-    setHighlight({
-      top: row.offsetTop,
-      height: row.offsetHeight,
-    });
-  }, [activeTaskId]);
-
-  // While the rotation list is animating, we re-measure on every ResizeObserver
-  // tick — and we don't want the pill's own transition to play catch-up against
-  // those changes, since that would feel laggy. The pill snaps during the
-  // animation and smoothly slides only for inter-row jumps (active task changes
-  // between rows that are already at their resting size).
-  const [isRotating, setIsRotating] = useState(false);
-  useEffect(() => {
-    measureHighlight();
-    if (!hasAnimated.current) {
-      requestAnimationFrame(() => {
-        hasAnimated.current = true;
-      });
-    }
-    setIsRotating(true);
-    const t = setTimeout(() => setIsRotating(false), 700);
-    return () => clearTimeout(t);
-  }, [measureHighlight, rows]);
-
-  // Keep the highlight glued to the active row while motion animates the
-  // surrounding rows' heights — the container resizes as rows open/close,
-  // so the pill needs to re-measure on every layout shift.
-  useEffect(() => {
-    const node = containerRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(() => measureHighlight());
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [measureHighlight]);
+  // The active row's pill fades out while its row animates out of the list.
+  const activeLeaving = rows.some((r) => r.task.id === activeTaskId && r.phase === 'leaving');
+  const { containerRef, setRow, pill } = useSlidingPill(activeTaskId, activeLeaving, rows);
 
   return (
     <div className="px-2 pt-1.5 pb-1.5 mb-0.5">
@@ -156,22 +103,8 @@ export function RotationSection({
           Active tasks
         </span>
       </Tooltip>
-      <div ref={containerRef} className="relative space-y-px">
-        {/* Sliding highlight */}
-        {highlight && (
-          <div
-            className="sidebar-pill-active absolute left-0 right-0 rounded-md pointer-events-none"
-            style={{
-              top: highlight.top,
-              height: highlight.height,
-              // Match the active row's scale pop (see the row's scale-[1.035])
-              // so the highlight stays sized to the popped text.
-              transform: 'scale(1.035)',
-              transition:
-                hasAnimated.current && !isRotating ? 'top 200ms ease, height 200ms ease' : 'none',
-            }}
-          />
-        )}
+      <div ref={containerRef} className="relative isolate space-y-px">
+        <SlidingPill pill={pill} />
         {rows.map(({ task, phase }) => {
           const collapsed = phase !== 'present';
           const activity = taskActivity[task.id]?.state;
@@ -182,7 +115,9 @@ export function RotationSection({
           return (
             <div
               key={task.id}
-              ref={(el) => setRowRef(task.id, el)}
+              // The pill tracks this wrapper, not the row inside it: the
+              // wrapper's height is what animates as a row enters or leaves.
+              ref={(el) => setRow(task.id, el)}
               className="grid"
               style={{
                 gridTemplateRows: collapsed ? '0fr' : '1fr',

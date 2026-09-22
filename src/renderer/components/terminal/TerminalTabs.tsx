@@ -470,10 +470,10 @@ export function TerminalTabs({
       {collapsed ? (
         <button
           onClick={onExpand}
-          className={`h-full w-full flex items-center gap-2 px-4 transition-colors border-t border-white/8 ${
+          className={`h-full w-full flex items-center gap-2 px-4 transition-colors border-t border-edge/8 ${
             hasUnseenTui
               ? 'bg-primary/10 text-primary hover:bg-primary/15'
-              : 'text-foreground/80 hover:text-foreground hover:bg-white/4'
+              : 'text-foreground/80 hover:text-foreground hover:bg-edge/4'
           }`}
         >
           <Terminal size={12} strokeWidth={1.8} />
@@ -489,7 +489,7 @@ export function TerminalTabs({
           <ChevronUp size={12} strokeWidth={1.8} className="ml-auto" />
         </button>
       ) : (
-        <div className="relative flex items-center h-7 shrink-0 border-t border-white/8 pl-1">
+        <div className="relative flex items-center h-7 shrink-0 border-t border-edge/8 pl-1">
           {/* Hidden measuring row — lays out every shell/service tab off-screen
               so the overflow split below uses real measured widths even for tabs
               currently collapsed into the dropdown. */}
