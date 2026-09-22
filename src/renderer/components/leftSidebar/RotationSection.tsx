@@ -226,26 +226,36 @@ export function RotationSection({
                       {/* Runs in the project's own checkout, not a worktree */}
                       {!task.useWorktree && <MainRepoBadge branch={task.branch} />}
 
-                      {showPercent && ctx && ctx.percentage > 0 && (
-                        <span
-                          className="text-[11px] tabular-nums shrink-0 group-hover/rot:hidden text-muted-foreground"
-                          title={`Context: ${ctx.used.toLocaleString()} / ${ctx.total.toLocaleString()} tokens (${Math.round(ctx.percentage)}%)`}
-                        >
-                          {Math.round(ctx.percentage)}%
-                        </span>
-                      )}
-
-                      <div className="hidden group-hover/rot:flex gap-0.5 shrink-0">
-                        <IconButton
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveFromRotation?.(task.id);
-                          }}
-                          title="Remove from rotation"
-                          size="sm"
-                        >
-                          <X size={12} strokeWidth={1.8} />
-                        </IconButton>
+                      {/* Right slot, as on the project-tree rows: the context
+                          percentage at rest and the action on hover, each
+                          sliding over the other via grid-fraction tracks. */}
+                      <div className="flex items-center shrink-0">
+                        <div className="grid transition-[grid-template-columns,opacity] duration-200 ease-out grid-cols-[1fr] opacity-100 group-hover/rot:grid-cols-[0fr] group-hover/rot:opacity-0">
+                          <div className="overflow-hidden min-w-0 flex items-center">
+                            {showPercent && ctx && ctx.percentage > 0 && (
+                              <span
+                                className="text-[11px] tabular-nums shrink-0 text-muted-foreground"
+                                title={`Context: ${ctx.used.toLocaleString()} / ${ctx.total.toLocaleString()} tokens (${Math.round(ctx.percentage)}%)`}
+                              >
+                                {Math.round(ctx.percentage)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid transition-[grid-template-columns,opacity,transform] duration-200 ease-out grid-cols-[0fr] opacity-0 translate-x-1.5 group-hover/rot:grid-cols-[1fr] group-hover/rot:opacity-100 group-hover/rot:translate-x-0">
+                          <div className="overflow-hidden min-w-0">
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveFromRotation?.(task.id);
+                              }}
+                              title="Remove from rotation"
+                              size="sm"
+                            >
+                              <X size={12} strokeWidth={1.8} />
+                            </IconButton>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {project && (

@@ -12,10 +12,8 @@ import {
   GitBranch,
   FolderGit2,
   Globe,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
+  ChevronFirst,
+  ChevronLast,
 } from 'lucide-react';
 import type { Project, Task, LinkedItem } from '../../shared/types';
 import { branchUrl, linkedItemUrl } from '../../shared/urls';
@@ -189,8 +187,13 @@ export function MainContent({
       : 'Branch'
     : 'Branch (no upstream)';
   const BranchIcon = activeTask?.useWorktree ? FolderGit2 : GitBranch;
-  const LeftToggleIcon = sidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
-  const RightToggleIcon = changesPanelCollapsed ? PanelRightOpen : PanelRightClose;
+  // Each toggle is a plain edge glyph for the side its panel lives on: |< for
+  // the left sidebar, >| for the right inspector (the tooltip names the action).
+  // Plain edge glyphs that point the way the panel will move: an open panel
+  // shows "collapse toward its edge" (|< left, >| right), a collapsed one the
+  // reverse.
+  const LeftToggleIcon = sidebarCollapsed ? ChevronLast : ChevronFirst;
+  const RightToggleIcon = changesPanelCollapsed ? ChevronFirst : ChevronLast;
   const ghostBtn =
     'w-7 h-7 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors';
 

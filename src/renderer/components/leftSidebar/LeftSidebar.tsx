@@ -96,8 +96,11 @@ export function LeftSidebar({
         {/* Everything between the top inset and the footer scrolls as one
             column, so every task and project stays reachable however many
             there are. The rail is too narrow for a scrollbar, so it's hidden;
-            wheel and trackpad scrolling still work. */}
-        <div className="flex-1 min-h-0 w-full flex flex-col items-center gap-1 overflow-y-auto overflow-x-hidden scrollbar-none">
+            wheel and trackpad scrolling still work. The scroller is 8px wider
+            than the rail on each side (with matching padding, so the content
+            box is the rail) because status dots sit centred on the rail's
+            border and a scroll container clips anything past its own box. */}
+        <div className="flex-1 min-h-0 w-[calc(100%+16px)] px-2 flex flex-col items-center gap-1 overflow-y-auto overflow-x-hidden scrollbar-none">
           {showRotation && (
             <>
               <div className="shrink-0 flex flex-col items-center gap-1 w-full">
@@ -119,17 +122,17 @@ export function LeftSidebar({
                         </button>
                       </Tooltip>
                       {activity === 'error' ? (
-                        <div className="status-dot-err absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                        <div className="status-dot-err absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                       ) : activity === 'waiting' ? (
-                        <div className="status-dot-wait absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                        <div className="status-dot-wait absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                       ) : activity === 'busy' ? (
-                        <div className="absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full bg-amber-400 status-pulse" />
+                        <div className="absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full bg-amber-400 status-pulse" />
                       ) : activity === 'idle' && unseenTaskIds?.has(task.id) ? (
-                        <div className="status-dot-unseen absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                        <div className="status-dot-unseen absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                       ) : activity === 'idle' ? (
-                        <div className="status-dot-idle absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                        <div className="status-dot-idle absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                       ) : activity === 'stopped' ? (
-                        <div className="status-dot-stopped absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
+                        <div className="status-dot-stopped absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full" />
                       ) : null}
                     </div>
                   );
@@ -209,7 +212,7 @@ export function LeftSidebar({
                   {activity && (
                     <Tooltip content={activityLabel}>
                       <div
-                        className={`absolute right-0.5 top-1/2 mt-[-3px] w-2 h-2 rounded-full ${
+                        className={`absolute -right-1 top-1/2 mt-[-3px] w-2 h-2 rounded-full ${
                           activity === 'error'
                             ? 'status-dot-err'
                             : activity === 'waiting'

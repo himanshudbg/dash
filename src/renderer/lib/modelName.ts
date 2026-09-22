@@ -10,7 +10,10 @@ export function headerModelName(
   statusLineModel: string | undefined,
   taskModel: TaskModel | undefined,
 ): string | null {
-  if (statusLineModel && statusLineModel.trim()) return statusLineModel.trim();
+  // Drop parenthesised qualifiers ("Opus 5.5 (1M context)" → "Opus 5.5") to
+  // keep the header pill short.
+  const live = statusLineModel?.replace(/\s*\([^)]*\)/g, '').trim();
+  if (live) return live;
   if (!taskModel || taskModel === 'default') return null;
   return taskModel.charAt(0).toUpperCase() + taskModel.slice(1);
 }
