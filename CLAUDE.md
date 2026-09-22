@@ -2,22 +2,14 @@
 
 ## What is Dash
 
-Electron desktop app for running Claude Code across multiple projects, each task in its own git worktree. xterm.js + node-pty terminals, SQLite + Drizzle ORM, React 18 UI. macOS arm64, Linux x64.
+Electron desktop app for running Claude Code across multiple projects, each task in its own git worktree.
 
 ## Commands
 
+Scripts live in `package.json`. The one that is not there:
+
 ```bash
-pnpm install              # install deps
 npx electron-rebuild -f -w node-pty,better-sqlite3  # rebuild native modules for Electron
-pnpm dev                  # Vite on :3000 + Electron
-pnpm dev:main             # main process only
-pnpm dev:renderer         # Vite dev server only
-pnpm build                # compile main (tsc) + renderer (vite)
-pnpm test                 # vitest under Electron's Node (ELECTRON_RUN_AS_NODE)
-pnpm type-check           # typecheck both processes
-pnpm package:mac          # build + package as .dmg (arm64)
-pnpm package:linux        # build + package as .AppImage (x64)
-pnpm drizzle:generate     # generate Drizzle migrations
 ```
 
 Renderer hot-reloads; main process changes require restart. Husky pre-commit runs lint-staged (Prettier + ESLint on staged `.ts`/`.tsx`).
@@ -28,32 +20,15 @@ Renderer hot-reloads; main process changes require restart. Husky pre-commit run
 
 ## Architecture
 
-Two-process Electron app, strict context isolation (nodeIntegration disabled).
-
-- **Main** (`src/main/`): `entry.ts` → `main.ts` boots PATH fix, DB, hook server, IPC handlers, activity monitor, supervisor polling, window. `DASH_USER_DATA_DIR` and `DASH_DEV_URL` env vars point a second dev instance at its own data dir and Vite port (needed to run a checkout beside an installed Dash).
-- **Task sessions** live under Claude Code's session supervisor, not under Dash: `SupervisorService` dispatches `claude --bg --name <task> …` in the worktree (resuming the task's recorded session id, or the newest transcript for a pre-supervisor task), records `tasks.job_id` / `session_id`, and `ptyManager` spawns `claude attach <jobId>` as the task's agent PTY. Killing an agent PTY only detaches; archive → `claude stop`, delete → `claude rm`, restart → stop + rm + re-dispatch with `--resume`. `SupervisorService.startPolling` reconciles `claude agents --json --all` into `ActivityMonitor` (hooks stay the instant signal; the listing is the truth for `waiting`/`error`/`stopped`) and pushes the listing to the renderer for the per-project "Other sessions" group.
-- **Hooks**: written per worktree to `.claude/settings.local.json` (`ptyHookSettings.ts`), keyed by `?ptyId=<taskId>`. Commands read the HookServer port from `<userData>/hook-port` at runtime (the supervisor freezes the dispatch env into the job, so the port cannot live in the env). Any hook event newer than `MIN_CLAUDE_VERSION` must still be gated with `isClaudeVersionAtLeast` (an unknown key makes Claude Code drop the whole file).
-- **Renderer** (`src/renderer/`): React SPA. State lives in **Zustand stores** under `src/renderer/stores/` (`settingsStore`, `projectsStore`, `uiStore`, `gitStore`, `runtimeStore`); components subscribe with selectors instead of receiving drilled props, and stores read each other via `getState()`. `App.tsx` is a thin composition root (layout + modals + bootstrap). Communicates via `window.electronAPI` (preload bridge, typed in `src/types/electron-api.d.ts`). **Selector caveat:** a selector that returns a _derived_ array/object (`.filter`/`.map`/object-literal) must be wrapped in `useShallow` (`zustand/react/shallow`) or it re-renders infinitely; plain `s => s.field` selectors are stable.
-- **IPC**: `electronAPI.method()` → `ipcRenderer.invoke()` → handler in `src/main/ipc/` → `IpcResponse<T>` `{ success, data?, error? }`. Fire-and-forget via `send()` for ptyInput/resize/kill/snapshot-save.
-- **Services** (`src/main/services/`): Stateless singletons with static methods.
-- **Database** (`src/main/db/`): SQLite via better-sqlite3 + Drizzle ORM. WAL mode, foreign keys ON. Migrations run on startup. Tables: projects → tasks → conversations (cascade deletes).
-- **Shared types**: `src/shared/types.ts`
-
-## Path Aliases
-
-- `@/*` → `src/renderer/*` (renderer tsconfig) or `src/main/*` (main tsconfig)
-- `@shared/*` → `src/shared/*` (both tsconfigs)
-
-Main process `entry.ts` rewrites at runtime: `@shared/*` → `dist/main/shared/*`, `@/*` → `dist/main/main/*`.
+- `DASH_USER_DATA_DIR` and `DASH_DEV_URL` env vars point a second dev instance at its own data dir and Vite port (needed to run a checkout beside an installed Dash).
+- Main-process specifics (task sessions under Claude Code's supervisor, per-worktree hooks) are in `src/main/CLAUDE.md`; renderer state rules are in `src/renderer/CLAUDE.md`. Both load when you work under those directories.
+- Main process `entry.ts` rewrites the `@shared/*` and `@/*` path aliases at runtime: `@shared/*` → `dist/main/shared/*`, `@/*` → `dist/main/main/*`.
 
 ## Code Style
 
-- **Prettier**: 2 spaces, single quotes, semicolons, trailing commas, 100-char width
-- **ESLint**: `no-explicit-any` warn; `_` prefix unused vars allowed; `no-require-imports` off
 - **Tailwind CSS** for all styling; dark/light via class on root
 - **Colors**: HSL CSS custom properties only (no raw hex/rgb). Tokens: `foreground`, `muted-foreground`, `background`, `surface-0..3`, `primary`, `destructive`, `border`, `git-added/modified/deleted/renamed/untracked/conflicted`
 - **Icons**: lucide-react, 14px default, stroke-width 1.8
-- **File naming**: PascalCase for component/class files, camelCase for function/value modules (utils, hooks, stores); enforced by the `check-file` ESLint rule (runs in the pre-commit hook)
 
 ## Data Storage
 
@@ -61,8 +36,7 @@ Main process `entry.ts` rewrites at runtime: `@shared/*` → `dist/main/shared/*
 - **Snapshots**: `~/Library/Application Support/Dash/terminal-snapshots/` (shell and service tabs only; agent panes repaint on attach)
 - **Hook port file**: `~/Library/Application Support/Dash/hook-port` while Dash runs
 - **Worktrees**: `{projectPath}/.claude/worktrees/{task-slug}-{hash}/` (excluded via `.git/info/exclude`; legacy `{projectPath}/../worktrees/` tasks are migrated by `WorktreeMigrationService`)
-- **UI state**: localStorage (active project/task, theme, keybindings, panel states, notification prefs)
 
 ## Requirements
 
-Node.js 24 (`.nvmrc`), pnpm (`shamefully-hoist` in `.npmrc`), Claude Code CLI ≥ 2.1.257 (`MIN_CLAUDE_VERSION` in `src/main/services/claudeCli.ts`; task sessions refuse to start below it), Git. macOS arm64 or Linux x64.
+Claude Code CLI ≥ `MIN_CLAUDE_VERSION` (`src/main/services/claudeCli.ts`); task sessions refuse to start below it.
