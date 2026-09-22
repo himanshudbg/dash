@@ -7,7 +7,7 @@ import { useGit } from '../stores/gitStore';
 import { useRuntime } from '../stores/runtimeStore';
 import {
   FolderOpen,
-  Code2,
+  MoreHorizontal,
   Blocks,
   GitBranch,
   FolderGit2,
@@ -20,6 +20,15 @@ import {
 import type { Project, Task, LinkedItem } from '../../shared/types';
 import { branchUrl, linkedItemUrl } from '../../shared/urls';
 import { Tooltip } from './ui/Tooltip';
+import { IconButton } from './ui/IconButton';
+import { IdeIcon, resolveIdeId } from './ui/IdeIcon';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/DropdownMenu';
+import { useProjects } from '../stores/projectsStore';
 import { TokenBadge } from './ui/TokenBadge';
 import { PrBadge } from './ui/PrBadge';
 
@@ -96,6 +105,8 @@ interface MainContentProps {
   onToggleChangesPanel?: () => void;
   onSelectTask?: (id: string) => void;
   onEnableRemoteControl?: () => void;
+  /** The model the active task's session is running (live, from its status line). */
+  modelName?: string | null;
   onOpenIde?: () => void;
   // Open the Extensions browser filtered to the given scope (taskId or projectId).
   onOpenExtensions?: (scopeId: string) => void;
@@ -123,6 +134,7 @@ export function MainContent({
   onToggleChangesPanel,
   onSelectTask,
   onEnableRemoteControl,
+  modelName,
   onOpenIde,
   onOpenExtensions,
   onNewTask,
@@ -142,6 +154,10 @@ export function MainContent({
   const remoteControlStates = useRuntime((s) => s.remoteControlStates);
   const claudeCli = useRuntime((s) => s.claudeCli);
   const remoteControlState = activeTask ? (remoteControlStates[activeTask.id] ?? null) : null;
+  const preferredIDE = useSettings((s) => s.preferredIDE);
+  const availableIDEs = useProjects((s) => s.availableIDEs);
+  const ideId = resolveIdeId(preferredIDE, availableIDEs);
+  const ideLabel = availableIDEs.find((i) => i.id === ideId)?.label ?? null;
   if (!activeProject) {
     return (
       <div className="h-full flex flex-col bg-background">
@@ -237,45 +253,63 @@ export function MainContent({
 
         {activeTask && prInfo && <PrBadge prInfo={prInfo} />}
 
-        {activeTask && (
-          <Tooltip content="Remote control">
-            <button
-              onClick={onEnableRemoteControl}
-              className={`w-6 h-6 rounded inline-flex items-center justify-center transition-colors ${
-                remoteControlState
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-              }`}
-            >
-              <Globe size={13} strokeWidth={1.8} />
-            </button>
+        {activeTask && modelName && (
+          <Tooltip content="Model">
+            <span className="inline-flex items-center px-2 py-[3px] rounded-full bg-foreground/5 text-muted-foreground font-mono text-[11px]">
+              <span className="truncate max-w-[180px]">{modelName}</span>
+            </span>
           </Tooltip>
         )}
 
         {activeTask && (
-          <Tooltip content="Extensions">
-            <button
-              onClick={() =>
-                onOpenExtensions?.(
-                  activeTask.useWorktree ? `task:${activeTask.id}` : `project:${activeProject.id}`,
-                )
-              }
-              className="w-6 h-6 rounded inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
-            >
-              <Blocks size={13} strokeWidth={1.8} />
-            </button>
-          </Tooltip>
-        )}
-
-        {activeTask && (
-          <Tooltip content="Open in IDE">
+          <Tooltip content={ideLabel ? `Open in ${ideLabel}` : 'Open in IDE'}>
             <button
               onClick={onOpenIde}
               className="w-6 h-6 rounded inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
             >
-              <Code2 size={13} strokeWidth={1.8} />
+              <IdeIcon ideId={ideId} />
             </button>
           </Tooltip>
+        )}
+
+        {/* Less-used task controls live behind "…" */}
+        {activeTask && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                title="More"
+                variant="muted"
+                className="w-6 h-6 inline-flex items-center justify-center p-0!"
+              >
+                <MoreHorizontal size={14} strokeWidth={1.8} />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuItem onSelect={() => onEnableRemoteControl?.()}>
+                <Globe
+                  size={13}
+                  strokeWidth={1.8}
+                  className={remoteControlState ? 'text-primary' : 'text-muted-foreground'}
+                />
+                Remote control
+                {remoteControlState && (
+                  <span className="ml-auto text-[10px] font-medium text-primary">On</span>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  onOpenExtensions?.(
+                    activeTask.useWorktree
+                      ? `task:${activeTask.id}`
+                      : `project:${activeProject.id}`,
+                  )
+                }
+              >
+                <Blocks size={13} strokeWidth={1.8} className="text-muted-foreground" />
+                Extensions
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {/* The inspector toggles the per-task changes panel, which only exists

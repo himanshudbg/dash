@@ -28,6 +28,9 @@ const SHELL_ZSHRC = `\
 # Restore ZDOTDIR to HOME so user config loads normally
 ZDOTDIR="$HOME"
 [[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"
+# Per-task history: set after the user's config (and /etc/zshrc, which sets
+# HISTFILE unconditionally) so it wins. zsh loads the file after the rc files.
+[[ -n "$DASH_HISTFILE" ]] && HISTFILE="$DASH_HISTFILE"
 # Apply our prompt after user config
 source "\${__DASH_ZDOTDIR}/prompt.zsh"
 `;
@@ -83,4 +86,26 @@ export function ensureShellConfig(): string {
 
   shellConfigDir = dir;
   return dir;
+}
+
+/** One shell-history file per task, under userData/shell-history. */
+function shellHistoryFile(taskId: string): string {
+  const safe = taskId.replace(/[^A-Za-z0-9_-]/g, '_');
+  return path.join(app.getPath('userData'), 'shell-history', safe);
+}
+
+/**
+ * The history file for a task's drawer shells, so each task keeps its own
+ * command history instead of sharing one across every task. Creates the
+ * directory, which the shell will not.
+ */
+export function shellHistoryPath(taskId: string): string {
+  const file = shellHistoryFile(taskId);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  return file;
+}
+
+/** Drop a deleted task's shell history. */
+export function removeShellHistory(taskId: string): void {
+  fs.rmSync(shellHistoryFile(taskId), { force: true });
 }

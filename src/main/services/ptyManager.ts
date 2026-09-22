@@ -7,7 +7,7 @@ import { stripHostTerminalEnv } from './hostTerminalEnv';
 import { WorkspacePortsRuntime } from './WorkspacePortsRuntime';
 import { TerminalMirror } from './TerminalMirror';
 import { terminalSnapshotService } from './TerminalSnapshotService';
-import { ensureShellConfig } from './ptyShellConfig';
+import { ensureShellConfig, shellHistoryPath } from './ptyShellConfig';
 import { findClaudePath, findLatestSessionId } from './claudeCli';
 import { buildClaudeEnv } from './claudeEnv';
 import { supervisorService } from './SupervisorService';
@@ -519,6 +519,16 @@ export async function startPty(options: {
 
   const pty = getPty();
 
+  // Shell PTY IDs follow the shape `shell:<taskId>[:N]`; parse the taskId so
+  // task-scoped queries (listForTask, restartAllForTask) can find this PTY
+  // without resorting to string-prefix matching on the id, and so the shell
+  // gets the task's own history file.
+  const shellPrefix = 'shell:';
+  const shellRest = options.id.startsWith(shellPrefix)
+    ? options.id.slice(shellPrefix.length)
+    : options.id;
+  const shellTaskId = shellRest.split(':')[0]!;
+
   const isWin = process.platform === 'win32';
   const shell = isWin ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
   // Interactive, NOT login. The login files (.zprofile/.zlogin) add ~0.5s to
@@ -545,6 +555,13 @@ export async function startPty(options: {
     if (shell.endsWith('/zsh') || shell === 'zsh') {
       env.ZDOTDIR = ensureShellConfig();
     }
+
+    // Per-task command history. zsh picks DASH_HISTFILE up at the end of the
+    // Dash rc wrapper; bash honours HISTFILE from the environment unless the
+    // user's .bashrc overrides it.
+    const historyFile = shellHistoryPath(shellTaskId);
+    env.DASH_HISTFILE = historyFile;
+    if (shell.endsWith('/bash') || shell === 'bash') env.HISTFILE = historyFile;
   }
 
   // Same port-env injection as direct PTYs — the terminal drawer shares the
@@ -563,15 +580,6 @@ export async function startPty(options: {
     cwd: options.cwd,
     env: env as Record<string, string>,
   });
-
-  // Shell PTY IDs follow the shape `shell:<taskId>[:N]`; parse the taskId so
-  // task-scoped queries (listForTask, restartAllForTask) can find this PTY
-  // without resorting to string-prefix matching on the id.
-  const shellPrefix = 'shell:';
-  const shellRest = options.id.startsWith(shellPrefix)
-    ? options.id.slice(shellPrefix.length)
-    : options.id;
-  const shellTaskId = shellRest.split(':')[0]!;
 
   const record: PtyRecord = {
     proc,

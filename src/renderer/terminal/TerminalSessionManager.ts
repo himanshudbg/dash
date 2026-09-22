@@ -14,6 +14,7 @@ import { clackBlock, clackExitBlock } from './clackLines';
 import { isPromptOnlySnapshot } from './snapshotFilter';
 import { FitScheduler } from './FitScheduler';
 import { MouseModeTracker } from './mouseModeFilter';
+import { macShellKeySequence } from './shellKeys';
 import { TUI_COLS, TUI_ROWS } from '../../shared/tuiProtocol';
 
 // Heap mark above which a terminal trims its own scrollback to relieve pressure.
@@ -214,6 +215,17 @@ export class TerminalSessionManager {
       if (e.type !== 'keydown') return true;
 
       const isMac = navigator.userAgent.includes('Mac');
+
+      // Drawer shell: Option/Cmd+arrows move by word / to line ends, as in
+      // Terminal.app. Agent panes keep xterm's encoding for Claude Code.
+      if (isMac && this.shellOnly) {
+        const seq = macShellKeySequence(e);
+        if (seq) {
+          e.preventDefault();
+          window.electronAPI.ptyInput({ id: this.id, data: seq });
+          return false;
+        }
+      }
 
       // Match by physical key (e.code) so alternate keyboard layouts where
       // Ctrl+Shift+C reports e.key as something other than 'C' still work.

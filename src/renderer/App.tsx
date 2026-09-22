@@ -9,6 +9,7 @@ import { TUI_FEATURE_IDS } from '@shared/tuiProtocol';
 import { LeftSidebar } from './components/leftSidebar/LeftSidebar';
 import { MainContent } from './components/MainContent';
 import { openInIde } from './lib/openInIde';
+import { headerModelName } from './lib/modelName';
 import { RightInspector } from './components/rightInspector/RightInspector';
 import { PortsDrawerWrapper } from './components/rightInspector/PortsDrawerWrapper';
 const DiffEditorModal = lazy(() => import('./components/diffEditor/DiffEditorModal'));
@@ -1124,7 +1125,7 @@ export function App() {
             onRestoreTask={(id) => {
               void handleRestoreTask(id);
             }}
-            onCloseTask={handleCloseTask}
+            onCloseTask={(id) => void handleCloseTask(id)}
             onTaskSettings={handleTaskSettings}
             onOpenSettings={() => {
               setSettingsInitialTab(undefined);
@@ -1198,6 +1199,11 @@ export function App() {
               onToggleChangesPanel={toggleChangesPanel}
               onSelectTask={setActiveTaskId}
               onEnableRemoteControl={() => activeTask && setRemoteControlModalPtyId(activeTask.id)}
+              modelName={
+                activeTask
+                  ? headerModelName(statusLineData[activeTask.id]?.model, activeTask.model)
+                  : null
+              }
               onOpenIde={() => {
                 if (activeTask) void openInIde(activeTask.path);
               }}
@@ -1225,7 +1231,7 @@ export function App() {
                   ? (tasksByProject[activeProjectId] || []).filter((t) => t.archivedAt)
                   : []
               }
-              onCloseTask={handleCloseTask}
+              onCloseTask={(id) => void handleCloseTask(id)}
               onTaskSettings={handleTaskSettings}
               onDeleteTask={handleDeleteTask}
               onArchiveTask={(id) => {

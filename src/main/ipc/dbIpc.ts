@@ -11,6 +11,7 @@ import {
 } from '../services/PortsConfigWatcher';
 import { discardInitialPrompt, stopTaskSession, removeTaskSession } from '../services/ptyManager';
 import { getTuiHost } from '../tui/hostInstance';
+import { removeShellHistory } from '../services/ptyShellConfig';
 
 export function registerDbIpc(): void {
   // ── Projects ─────────────────────────────────────────────
@@ -102,6 +103,7 @@ export function registerDbIpc(): void {
       // ports-setup toast for this task.
       stopPortsConfigWatch(id);
       discardInitialPrompt(id);
+      removeShellHistory(id);
       void getTuiHost().cancelForTask(id);
       TelemetryService.capture('task_deleted');
       return { success: true };

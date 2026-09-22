@@ -7,7 +7,7 @@ interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElem
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   /** Tooltip text (not a native title, which would double up). */
   title: string;
-  variant?: 'default' | 'destructive';
+  variant?: 'default' | 'destructive' | 'muted';
   size?: IconButtonSize;
   className?: string;
   children: React.ReactNode;
@@ -16,6 +16,8 @@ interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElem
 const variantStyles = {
   default: 'hover:bg-accent text-foreground/80 hover:text-foreground',
   destructive: 'hover:bg-destructive/15 text-foreground/80 hover:text-destructive',
+  /** Header-strip style: muted at rest, like the header's other ghost buttons. */
+  muted: 'text-muted-foreground hover:text-foreground hover:bg-foreground/5',
 } as const;
 
 const sizeStyles = {

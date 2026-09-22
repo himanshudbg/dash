@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import { IconButton } from '../ui/IconButton';
 import { Tooltip } from '../ui/Tooltip';
+import { MainRepoBadge } from '../ui/MainRepoBadge';
 import { useRuntime } from '../../stores/runtimeStore';
 import { useSettings } from '../../stores/settingsStore';
 import type { Project, Task, ContextUsage } from '../../../shared/types';
@@ -221,6 +222,9 @@ export function RotationSection({
                       the title (matching the project-tree task rows). */}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="truncate flex-1 min-w-0">{task.name}</span>
+
+                      {/* Runs in the project's own checkout, not a worktree */}
+                      {!task.useWorktree && <MainRepoBadge branch={task.branch} />}
 
                       {showPercent && ctx && ctx.percentage > 0 && (
                         <span

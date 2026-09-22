@@ -12,7 +12,7 @@ interface TooltipProps {
   >;
 }
 
-export function Tooltip({ content, side = 'top', delay = 150, children }: TooltipProps) {
+export function Tooltip({ content, side = 'top', delay = 1000, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
