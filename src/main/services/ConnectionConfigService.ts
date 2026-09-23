@@ -2,6 +2,7 @@ import { app, safeStorage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import type { AzureDevOpsConfig } from '@shared/types';
+import { normalizeAdoProject } from '@shared/urls';
 
 interface StoredAdoEntry {
   organizationUrl: string;
@@ -75,7 +76,8 @@ export class ConnectionConfigService {
     try {
       return {
         organizationUrl: entry.organizationUrl,
-        project: entry.project,
+        // Configs saved from a remote before it was decoded hold `AI%20og%20DT`.
+        project: normalizeAdoProject(entry.project),
         pat: this.decryptPat(entry.encryptedPat),
       };
     } catch {
@@ -90,7 +92,7 @@ export class ConnectionConfigService {
     const key = projectId || DEFAULT_KEY;
     config.ado[key] = {
       organizationUrl: adoConfig.organizationUrl,
-      project: adoConfig.project,
+      project: normalizeAdoProject(adoConfig.project),
       encryptedPat: this.encryptPat(adoConfig.pat),
     };
 

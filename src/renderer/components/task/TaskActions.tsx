@@ -1,13 +1,8 @@
-import { Code2, Power, Settings, Archive, Trash2, MoreHorizontal } from 'lucide-react';
+import { Power, MoreHorizontal } from 'lucide-react';
 import type { ActivityState } from '../../../shared/types';
 import { IconButton } from '../ui/IconButton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/DropdownMenu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/DropdownMenu';
+import { TaskMenuItems } from './TaskMenuItems';
 
 interface TaskActionsProps {
   /** The task's activity state; the "Put to sleep" (power) button shows only
@@ -68,26 +63,12 @@ export function TaskActions({
         {/* Items render in a portal, but React events still bubble through the
             tree to the card's onClick — stop them here. */}
         <DropdownMenuContent align="end" className="min-w-36" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuItem onSelect={onOpenIde}>
-            <Code2 size={13} strokeWidth={1.8} className="text-muted-foreground" />
-            Open in IDE
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onSettings}>
-            <Settings size={13} strokeWidth={1.8} className="text-muted-foreground" />
-            Task settings
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onArchive}>
-            <Archive size={13} strokeWidth={1.8} className="text-muted-foreground" />
-            Archive
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={onDelete}
-            className="text-destructive focus:bg-destructive/10 data-highlighted:bg-destructive/10"
-          >
-            <Trash2 size={13} strokeWidth={1.8} />
-            Delete
-          </DropdownMenuItem>
+          <TaskMenuItems
+            onOpenIde={onOpenIde}
+            onSettings={onSettings}
+            onArchive={onArchive}
+            onDelete={onDelete}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

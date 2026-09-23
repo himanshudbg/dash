@@ -5,7 +5,9 @@ import type {
   PullRequest,
   PullRequestInfo,
 } from '@shared/types';
+import { normalizeAdoProject } from '@shared/urls';
 import { mapAdoPrList } from './adoPr';
+import { describeAdoFailure } from './adoErrors';
 
 const TIMEOUT_MS = 15_000;
 const API_VERSION = '7.1';
@@ -20,10 +22,11 @@ export class AzureDevOpsService {
    * contain spaces and other characters that are invalid in a raw URL path; left
    * unencoded they produce a malformed URL → 404, which the pickers surface as a
    * misleading "No results found". Repository names are already encoded at their
-   * call sites; this does the same for the project segment.
+   * call sites; this does the same for the project segment. Normalizing first keeps
+   * a config saved in encoded form (`AI%20og%20DT`) from being encoded twice.
    */
   private static proj(config: AzureDevOpsConfig): string {
-    return encodeURIComponent(config.project);
+    return encodeURIComponent(normalizeAdoProject(config.project));
   }
 
   private static async request(
@@ -38,20 +41,33 @@ export class AzureDevOpsService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    try {
-      const resp = await fetch(url, {
-        method: options?.method ?? 'GET',
-        headers: {
-          Authorization: this.authHeader(config.pat),
-          'Content-Type': options?.contentType ?? 'application/json',
-        },
-        body: options?.body ? JSON.stringify(options.body) : undefined,
-        signal: controller.signal,
-      });
+    const context = {
+      organizationUrl: baseUrl,
+      project: normalizeAdoProject(config.project),
+      pat: config.pat,
+    };
 
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        throw new Error(`ADO API ${resp.status}: ${text.slice(0, 200)}`);
+    try {
+      let resp: Response;
+      try {
+        resp = await fetch(url, {
+          method: options?.method ?? 'GET',
+          headers: {
+            Authorization: this.authHeader(config.pat),
+            'Content-Type': options?.contentType ?? 'application/json',
+          },
+          body: options?.body ? JSON.stringify(options.body) : undefined,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw new Error(describeAdoFailure({ error }, context));
+      }
+
+      // 203 and HTML answers are ADO's sign-in page, not data; resp.ok alone lets them through.
+      const contentType = resp.headers.get('content-type');
+      if (!resp.ok || resp.status === 203 || /text\/html/i.test(contentType ?? '')) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(describeAdoFailure({ status: resp.status, body, contentType }, context));
       }
 
       return await resp.json();
@@ -60,13 +76,9 @@ export class AzureDevOpsService {
     }
   }
 
-  static async testConnection(config: AzureDevOpsConfig): Promise<boolean> {
-    try {
-      await this.request(config, `${this.proj(config)}/_apis/wit/queries`, { method: 'GET' });
-      return true;
-    } catch {
-      return false;
-    }
+  /** Resolves when the config works; rejects with a message saying what to fix. */
+  static async testConnection(config: AzureDevOpsConfig): Promise<void> {
+    await this.request(config, `${this.proj(config)}/_apis/wit/queries`, { method: 'GET' });
   }
 
   static async searchWorkItems(
@@ -136,7 +148,7 @@ export class AzureDevOpsService {
 
     const pr = sorted[0]!;
     const baseUrl = config.organizationUrl.replace(/\/+$/, '');
-    const prUrl = `${baseUrl}/${config.project}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`;
+    const prUrl = `${baseUrl}/${this.proj(config)}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`;
 
     const stateMap: Record<string, 'open' | 'merged' | 'closed'> = {
       active: 'open',
@@ -319,7 +331,7 @@ export class AzureDevOpsService {
       title: (fields['System.Title'] as string) ?? '',
       state: (fields['System.State'] as string) ?? '',
       type: (fields['System.WorkItemType'] as string) ?? '',
-      url: raw._links?.html?.href || `${baseUrl}/${config.project}/_workitems/edit/${raw.id}`,
+      url: raw._links?.html?.href || `${baseUrl}/${this.proj(config)}/_workitems/edit/${raw.id}`,
       assignedTo: assignedTo?.displayName ?? assignedTo?.uniqueName,
       tags: tags
         ? tags

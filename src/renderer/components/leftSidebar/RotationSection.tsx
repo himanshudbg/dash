@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import { IconButton } from '../ui/IconButton';
+import { HoverSwapSlot } from '../ui/HoverSwapSlot';
 import { Tooltip } from '../ui/Tooltip';
 import { MainRepoBadge } from '../ui/MainRepoBadge';
 import { useRuntime } from '../../stores/runtimeStore';
@@ -95,6 +96,11 @@ export function RotationSection({
   // The active row's pill fades out while its row animates out of the list.
   const activeLeaving = rows.some((r) => r.task.id === activeTaskId && r.phase === 'leaving');
   const { containerRef, setRow, pill } = useSlidingPill(activeTaskId, activeLeaving, rows);
+  // Columns are reserved only when some row fills them, so an unused one
+  // doesn't leave a gap down the whole list.
+  const anyMainRepo = rows.some((r) => !r.task.useWorktree);
+  const anyPercent =
+    showPercent && rows.some((r) => (contextUsage[r.task.id]?.percentage ?? 0) > 0);
 
   return (
     <div className="px-2 pt-1.5 pb-1.5 mb-0.5">
@@ -130,7 +136,7 @@ export function RotationSection({
                 <div
                   draggable
                   {...getRotDragHandlers(task.id, rotationTasks)}
-                  className={`group/rot relative flex items-start gap-2 min-w-0 pl-3.5 pr-2 py-[6px] rounded-md text-[13px] cursor-pointer transition-[transform,color] duration-150 ${
+                  className={`group/swap relative flex items-start gap-2 min-w-0 pl-3.5 pr-2 py-[6px] rounded-md text-[13px] cursor-pointer transition-[transform,color] duration-150 ${
                     isActiveTask
                       ? 'text-foreground font-medium scale-[1.035]'
                       : 'sidebar-row-hover text-muted-foreground hover:text-foreground'
@@ -155,43 +161,48 @@ export function RotationSection({
                   <div className="flex flex-col flex-1 min-w-0 leading-tight">
                     {/* Title line — percentage and hover actions sit inline with
                       the title (matching the project-tree task rows). */}
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <span className="truncate flex-1 min-w-0">{task.name}</span>
 
-                      {/* Runs in the project's own checkout, not a worktree */}
-                      {!task.useWorktree && <MainRepoBadge branch={task.branch} />}
-
-                      {/* Right slot, as on the project-tree rows: the context
-                          percentage at rest and the action on hover, each
-                          sliding over the other via grid-fraction tracks. */}
-                      <div className="flex items-center shrink-0">
-                        <div className="grid transition-[grid-template-columns,opacity] duration-200 ease-out grid-cols-[1fr] opacity-100 group-hover/rot:grid-cols-[0fr] group-hover/rot:opacity-0">
-                          <div className="overflow-hidden min-w-0 flex items-center">
-                            {showPercent && ctx && ctx.percentage > 0 && (
-                              <span
-                                className="text-[11px] tabular-nums shrink-0 text-muted-foreground"
-                                title={`Context: ${ctx.used.toLocaleString()} / ${ctx.total.toLocaleString()} tokens (${Math.round(ctx.percentage)}%)`}
-                              >
-                                {Math.round(ctx.percentage)}%
+                      {/* At rest: the "main" badge (runs in the project's own
+                          checkout) and the context percentage, as columns — rows
+                          without a badge hold an invisible one so they line up.
+                          On hover the remove action slides in across them. */}
+                      <HoverSwapSlot
+                        rest={
+                          <span className="flex items-center gap-1.5">
+                            {anyMainRepo && (
+                              <span className={`flex ${task.useWorktree ? 'invisible' : ''}`}>
+                                <MainRepoBadge branch={task.branch} />
                               </span>
                             )}
-                          </div>
-                        </div>
-                        <div className="grid transition-[grid-template-columns,opacity,transform] duration-200 ease-out grid-cols-[0fr] opacity-0 translate-x-1.5 group-hover/rot:grid-cols-[1fr] group-hover/rot:opacity-100 group-hover/rot:translate-x-0">
-                          <div className="overflow-hidden min-w-0">
-                            <IconButton
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveFromRotation?.(task.id);
-                              }}
-                              title="Remove from rotation"
-                              size="sm"
-                            >
-                              <X size={12} strokeWidth={1.8} />
-                            </IconButton>
-                          </div>
-                        </div>
-                      </div>
+                            {anyPercent && (
+                              <span
+                                className="w-6 text-right text-[11px] tabular-nums text-muted-foreground"
+                                title={
+                                  ctx
+                                    ? `Context: ${ctx.used.toLocaleString()} / ${ctx.total.toLocaleString()} tokens (${Math.round(ctx.percentage)}%)`
+                                    : undefined
+                                }
+                              >
+                                {ctx && ctx.percentage > 0 ? `${Math.round(ctx.percentage)}%` : ''}
+                              </span>
+                            )}
+                          </span>
+                        }
+                        actions={
+                          <IconButton
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveFromRotation?.(task.id);
+                            }}
+                            title="Remove from rotation"
+                            size="sm"
+                          >
+                            <X size={12} strokeWidth={1.8} />
+                          </IconButton>
+                        }
+                      />
                     </div>
                     {project && (
                       <span className="truncate text-[10px] text-muted-fade-50 font-normal mt-0.5">

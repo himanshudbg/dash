@@ -24,8 +24,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/DropdownMenu';
+import { TaskMenuItems } from './task/TaskMenuItems';
 import { useProjects } from '../stores/projectsStore';
 import { TokenBadge } from './ui/TokenBadge';
 import { PrBadge } from './ui/PrBadge';
@@ -311,6 +313,13 @@ export function MainContent({
                 <Blocks size={13} strokeWidth={1.8} className="text-muted-foreground" />
                 Extensions
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <TaskMenuItems
+                onOpenIde={() => onOpenIde?.()}
+                onSettings={() => onTaskSettings?.(activeTask.id)}
+                onArchive={() => onArchiveTask?.(activeTask.id)}
+                onDelete={() => onDeleteTask?.(activeTask.id)}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         )}

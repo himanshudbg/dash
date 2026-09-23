@@ -31,8 +31,9 @@ export function registerAzureDevOpsIpc(): void {
   ipcMain.handle('ado:test-connection', async (_event, args: AzureDevOpsConfig) => {
     try {
       parseArgs('ado:test-connection', adoConfigSchema, args);
-      const ok = await AzureDevOpsService.testConnection(args);
-      return { success: true, data: ok };
+      // A failure rejects with a message naming what to fix (PAT, project, network).
+      await AzureDevOpsService.testConnection(args);
+      return { success: true, data: true };
     } catch (err) {
       return errorResponse(err);
     }

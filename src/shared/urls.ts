@@ -86,6 +86,15 @@ export function parseAdoRemote(
 }
 
 /** decodeURIComponent that returns the input unchanged on malformed escapes. */
+/**
+ * The ADO project name as ADO knows it (spaces, not `%20`). Configs saved before
+ * parseAdoRemote decoded its segments hold the encoded form (`AI%20og%20DT`),
+ * which the service then encoded again into a path ADO answers with a bare 404.
+ */
+export function normalizeAdoProject(project: string): string {
+  return safeDecode(project.trim());
+}
+
 function safeDecode(s: string): string {
   try {
     return decodeURIComponent(s);

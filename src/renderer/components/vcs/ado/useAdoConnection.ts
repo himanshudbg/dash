@@ -4,6 +4,9 @@ function normalizeUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+/** A failed test carries main's message saying what to fix (PAT, project, network). */
+export type AdoTestOutcome = 'success' | { error: string };
+
 interface AdoConnectionState {
   orgUrl: string;
   setOrgUrl: (v: string) => void;
@@ -12,8 +15,8 @@ interface AdoConnectionState {
   pat: string;
   setPat: (v: string) => void;
   testing: boolean;
-  testResult: 'success' | 'error' | null;
-  setTestResult: (v: 'success' | 'error' | null) => void;
+  testResult: AdoTestOutcome | null;
+  setTestResult: (v: AdoTestOutcome | null) => void;
   saving: boolean;
   isUrlValid: boolean;
   canSubmit: boolean;
@@ -38,7 +41,7 @@ export function useAdoConnection({
   const [project, setProject] = useState(initialProject);
   const [pat, setPat] = useState('');
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [testResult, setTestResult] = useState<AdoTestOutcome | null>(null);
   const [saving, setSaving] = useState(false);
 
   const isUrlValid = orgUrl.startsWith('https://');
@@ -53,9 +56,13 @@ export function useAdoConnection({
         project,
         pat,
       });
-      setTestResult(resp.success && resp.data ? 'success' : 'error');
-    } catch {
-      setTestResult('error');
+      setTestResult(
+        resp.success
+          ? 'success'
+          : { error: resp.error || 'Connection failed. Check the details above.' },
+      );
+    } catch (err) {
+      setTestResult({ error: String(err) });
     } finally {
       setTesting(false);
     }

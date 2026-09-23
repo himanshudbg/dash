@@ -118,8 +118,11 @@ export function Modal({
           if (closing) onClose();
         }}
       >
+        {/* no-drag: Electron applies the titlebar's drag region regardless of
+            stacking, so without it a tall modal's top edge (the diff editor's
+            header buttons) sits under the drag strip and swallows clicks. */}
         <div
-          className={`modal-shell border border-border/40 rounded-xl ${size} flex flex-col ${overflow === 'visible' ? 'overflow-visible' : 'overflow-hidden'} ${closing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          className={`modal-shell titlebar-no-drag border border-border/40 rounded-xl ${size} flex flex-col ${overflow === 'visible' ? 'overflow-visible' : 'overflow-hidden'} ${closing ? 'animate-scale-out' : 'animate-scale-in'}`}
           style={cardStyle}
           onClick={(e) => e.stopPropagation()}
         >

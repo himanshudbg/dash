@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { parseAdoRemote, isAdoRemote } from '../urls';
+import { parseAdoRemote, isAdoRemote, normalizeAdoProject } from '../urls';
+
+describe('normalizeAdoProject', () => {
+  it('decodes a percent-encoded name saved from a remote (the double-encoding 404)', () => {
+    expect(normalizeAdoProject('AI%20og%20DT')).toBe('AI og DT');
+  });
+  it('leaves a plain name alone, trimming whitespace', () => {
+    expect(normalizeAdoProject('  AI og DT ')).toBe('AI og DT');
+  });
+  it('keeps a name that is not valid percent-encoding', () => {
+    expect(normalizeAdoProject('50% done')).toBe('50% done');
+  });
+});
 
 describe('parseAdoRemote', () => {
   it('parses a standard dev.azure.com HTTPS remote', () => {

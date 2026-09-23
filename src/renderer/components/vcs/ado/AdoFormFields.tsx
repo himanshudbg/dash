@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, AlertCircle } from 'lucide-react';
-import type { useAdoConnection } from './useAdoConnection';
+import type { useAdoConnection, AdoTestOutcome } from './useAdoConnection';
 
 type AdoConnectionState = ReturnType<typeof useAdoConnection>;
 
@@ -63,22 +63,23 @@ export function AdoFormFields({ state, autoFocusPat }: AdoFormFieldsProps) {
   );
 }
 
-export function AdoTestResult({ result }: { result: 'success' | 'error' | null }) {
+export function AdoTestResult({ result }: { result: AdoTestOutcome | null }) {
   if (!result) return null;
+  const ok = result === 'success';
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-        result === 'success'
+      className={`flex items-start gap-2 px-3 py-2 rounded-lg text-[11px] ${
+        ok
           ? 'bg-[hsl(var(--git-added)/0.1)] text-[hsl(var(--git-added))]'
           : 'bg-destructive/10 text-destructive'
       }`}
     >
-      {result === 'success' ? (
-        <Check size={12} strokeWidth={2.5} />
+      {ok ? (
+        <Check size={12} strokeWidth={2.5} className="shrink-0 mt-px" />
       ) : (
-        <AlertCircle size={12} strokeWidth={2} />
+        <AlertCircle size={12} strokeWidth={2} className="shrink-0 mt-px" />
       )}
-      {result === 'success' ? 'Connection successful' : 'Connection failed — check credentials'}
+      <span className="break-words">{ok ? 'Connection successful' : result.error}</span>
     </div>
   );
 }

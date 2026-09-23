@@ -19,6 +19,7 @@ import {
 import type { Project, Task, ContextUsage } from '../../../shared/types';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import { IconButton } from '../ui/IconButton';
+import { HoverSwapSlot } from '../ui/HoverSwapSlot';
 import { Tooltip } from '../ui/Tooltip';
 import { formatTokens, formatCost } from '../../utils/format';
 import { TaskCard } from './TaskCard';
@@ -286,7 +287,7 @@ export function ProjectsSection({
                     dragIdRef.current = null;
                     setDraggingId(null);
                   }}
-                  className={`group relative flex items-center gap-1.5 px-2 h-8 rounded-md text-sm cursor-pointer transition-transform duration-200 ease-in-out ${
+                  className={`group/swap relative flex items-center gap-1.5 px-2 h-8 rounded-md text-sm cursor-pointer transition-transform duration-200 ease-in-out ${
                     isActive
                       ? 'text-foreground font-medium'
                       : 'text-muted-foreground hover:text-foreground'
@@ -314,7 +315,10 @@ export function ProjectsSection({
                     )}
                   </button>
 
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  {/* Three columns — name, orb, count — at the same x on every
+                      project row: the orb and count keep their width even when
+                      empty. */}
+                  <div className="flex items-center min-w-0 flex-1">
                     {(() => {
                       const stats = projectTokenStats[project.id];
                       const nameSpan = (
@@ -334,105 +338,88 @@ export function ProjectsSection({
                       )} across ${stats.taskCount} task${stats.taskCount === 1 ? '' : 's'}`;
                       return <Tooltip content={tip}>{nameSpan}</Tooltip>;
                     })()}
-                    {isProjectCollapsed && hasActiveTask && (
-                      <Tooltip content="Active task in this project">
-                        <div className="status-dot-idle w-[6px] h-[6px] rounded-full shrink-0" />
-                      </Tooltip>
-                    )}
                   </div>
 
-                  {/* Right slot: task count at rest, the toolbar on hover (or
-                      while its menu is open) — "New task" plus a "…" menu —
-                      the two sliding over each other like the task rows. */}
-                  {(() => {
-                    const revealed = menuOpenProjectId === project.id;
-                    const revealCls = revealed
-                      ? 'grid-cols-[1fr] opacity-100 translate-x-0'
-                      : 'grid-cols-[0fr] opacity-0 translate-x-1.5 group-hover:grid-cols-[1fr] group-hover:opacity-100 group-hover:translate-x-0';
-                    const tuckCls = revealed
-                      ? 'grid-cols-[0fr] opacity-0'
-                      : 'grid-cols-[1fr] opacity-100 group-hover:grid-cols-[0fr] group-hover:opacity-0';
-                    return (
-                      <div className="flex items-center shrink-0">
-                        <div
-                          className={`grid transition-[grid-template-columns,opacity] duration-200 ease-out ${tuckCls}`}
+                  {/* Orb and task count at rest; on hover (or while its menu is
+                      open) "New task" plus a "…" menu slide in across them. */}
+                  <HoverSwapSlot
+                    revealed={menuOpenProjectId === project.id}
+                    rest={
+                      <>
+                        <span className="flex items-center justify-center w-2.5">
+                          {isProjectCollapsed && hasActiveTask && (
+                            <Tooltip content="Active task in this project">
+                              <div className="status-dot-idle w-[6px] h-[6px] rounded-full shrink-0" />
+                            </Tooltip>
+                          )}
+                        </span>
+                        <span
+                          className={`w-4 text-right text-xs text-muted-foreground tabular-nums leading-none ${
+                            isProjectCollapsed ? 'fade-50' : ''
+                          }`}
                         >
-                          <div className="overflow-hidden min-w-0 flex items-center">
-                            {projectTasks.length > 0 && (
-                              <span
-                                className={`text-xs text-muted-foreground tabular-nums shrink-0 mr-0.5 leading-none ${
-                                  isProjectCollapsed ? 'fade-50' : ''
-                                }`}
-                              >
-                                {projectTasks.length}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div
-                          className={`grid transition-[grid-template-columns,opacity,transform] duration-200 ease-out ${revealCls}`}
+                          {projectTasks.length > 0 ? projectTasks.length : ''}
+                        </span>
+                      </>
+                    }
+                    actions={
+                      <>
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNewTask(project.id);
+                          }}
+                          title="New task"
+                          size="sm"
                         >
-                          <div className="overflow-hidden min-w-0 flex items-center gap-0.5">
+                          <Plus size={13} strokeWidth={2} />
+                        </IconButton>
+                        <DropdownMenu
+                          onOpenChange={(open) => setMenuOpenProjectId(open ? project.id : null)}
+                        >
+                          <DropdownMenuTrigger asChild>
                             <IconButton
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onNewTask(project.id);
-                              }}
-                              title="New task"
+                              onClick={(e) => e.stopPropagation()}
+                              title="More actions"
                               size="sm"
                             >
-                              <Plus size={13} strokeWidth={2} />
+                              <MoreHorizontal size={13} strokeWidth={1.8} />
                             </IconButton>
-                            <DropdownMenu
-                              onOpenChange={(open) =>
-                                setMenuOpenProjectId(open ? project.id : null)
-                              }
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="min-w-40"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenuItem onSelect={() => onShowCommitGraph(project.id)}>
+                              <GitGraph
+                                size={13}
+                                strokeWidth={2}
+                                className="text-muted-foreground"
+                              />
+                              Commit graph
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => onProjectSettings(project.id)}>
+                              <Settings
+                                size={13}
+                                strokeWidth={1.8}
+                                className="text-muted-foreground"
+                              />
+                              Project settings
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() => onDeleteProject(project.id)}
+                              className="text-destructive focus:bg-destructive/10 data-highlighted:bg-destructive/10"
                             >
-                              <DropdownMenuTrigger asChild>
-                                <IconButton
-                                  onClick={(e) => e.stopPropagation()}
-                                  title="More actions"
-                                  size="sm"
-                                >
-                                  <MoreHorizontal size={13} strokeWidth={1.8} />
-                                </IconButton>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                className="min-w-40"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <DropdownMenuItem onSelect={() => onShowCommitGraph(project.id)}>
-                                  <GitGraph
-                                    size={13}
-                                    strokeWidth={2}
-                                    className="text-muted-foreground"
-                                  />
-                                  Commit graph
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => onProjectSettings(project.id)}>
-                                  <Settings
-                                    size={13}
-                                    strokeWidth={1.8}
-                                    className="text-muted-foreground"
-                                  />
-                                  Project settings
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onSelect={() => onDeleteProject(project.id)}
-                                  className="text-destructive focus:bg-destructive/10 data-highlighted:bg-destructive/10"
-                                >
-                                  <Trash2 size={13} strokeWidth={1.8} />
-                                  Delete project
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                              <Trash2 size={13} strokeWidth={1.8} />
+                              Delete project
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    }
+                  />
                 </div>
 
                 {/* Tasks nested under project */}
