@@ -91,8 +91,11 @@ export function FolderRow({
         <span className="font-mono text-[10px] flex gap-1.5 shrink-0 group-hover:invisible">
           {agg.add || agg.del ? (
             <>
-              {agg.add ? (
-                <span className="text-[hsl(var(--git-added)/0.75)]">+{agg.add}</span>
+              {/* New files count too, so the folders sum to the inspector's headline. */}
+              {agg.add + agg.untrackedAdd ? (
+                <span className="text-[hsl(var(--git-added)/0.75)]">
+                  +{agg.add + agg.untrackedAdd}
+                </span>
               ) : null}
               {agg.del ? (
                 <span className="text-[hsl(var(--git-deleted)/0.75)]">−{agg.del}</span>
