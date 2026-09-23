@@ -1,6 +1,9 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
-import { ChevronDown, ChevronRight, GitCommit, History, ListFilter } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, GitCommit, History, ListFilter } from 'lucide-react';
+import { toast } from 'sonner';
+import { HoverSwapSlot } from '../ui/HoverSwapSlot';
+import { IconButton } from '../ui/IconButton';
 import type { FileChange, FileChangeStatus } from '../../../shared/types';
 import { formatRelativeTime } from '@shared/relativeTime';
 import type { CommitSummary, EditorView } from './types';
@@ -182,6 +185,94 @@ function buildRepoTree(
   return root;
 }
 
+/** Widths (in `ch` of the tree's monospace font) of the trailing stat columns,
+ *  each sized to the widest value in the tree so rows line up with no slack.
+ *  0 = no row fills that column, so it isn't drawn. */
+interface TreeColumns {
+  comments: boolean;
+  add: number;
+  del: number;
+  /** The status letter on files and the changed count on folders share it. */
+  status: number;
+}
+
+function treeColumns(root: TreeFolder, commentCounts: Map<string, number>): TreeColumns {
+  const cols: TreeColumns = { comments: false, add: 0, del: 0, status: 0 };
+  const walk = (node: TreeFolder) => {
+    for (const f of node.files) {
+      if ((commentCounts.get(f.fullPath) ?? 0) > 0) cols.comments = true;
+      const c = f.change;
+      if (!c) continue;
+      cols.status = Math.max(cols.status, 1);
+      if (c.additions > 0) cols.add = Math.max(cols.add, String(c.additions).length + 1);
+      if (c.deletions > 0) cols.del = Math.max(cols.del, String(c.deletions).length + 1);
+    }
+    for (const child of node.children.values()) {
+      if (child.changedCount > 0) {
+        cols.status = Math.max(cols.status, String(child.changedCount).length);
+      }
+      walk(child);
+    }
+  };
+  walk(root);
+  return cols;
+}
+
+function copyPath(path: string) {
+  void window.electronAPI.clipboardWriteText(path);
+  toast('Copied path', { description: path, duration: 1800 });
+}
+
+function CopyPathAction({ path }: { path: string }) {
+  return (
+    <IconButton
+      onClick={(e) => {
+        e.stopPropagation();
+        copyPath(path);
+      }}
+      title="Copy path"
+      size="sm"
+    >
+      <Copy size={11} strokeWidth={1.8} />
+    </IconButton>
+  );
+}
+
+/** A tree row: a div (it holds the copy button, which a <button> can't) that
+ *  still activates on click, Enter and Space. `group/swap` drives HoverSwapSlot. */
+function TreeRow({
+  onActivate,
+  className,
+  style,
+  title,
+  children,
+}: {
+  onActivate: () => void;
+  className: string;
+  style: React.CSSProperties;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      title={title}
+      onClick={onActivate}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onActivate();
+        }
+      }}
+      style={style}
+      className={`group/swap w-full flex items-center gap-1 py-0.5 rounded-md text-[12px] cursor-pointer outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40 transition-colors ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 function pickDominant(statuses: Set<FileChangeStatus>): FileChangeStatus | null {
   if (statuses.size === 0) return null;
   for (const s of STATUS_PRIORITY) if (statuses.has(s)) return s;
@@ -291,6 +382,7 @@ function FileTreePanel({
     }
     return { additions, deletions };
   }, [changedFiles]);
+  const cols = useMemo(() => treeColumns(tree, commentCounts), [tree, commentCounts]);
   return (
     <div className="h-full min-h-0 flex flex-col">
       <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-fade-70 font-mono flex items-center justify-between shrink-0">
@@ -341,6 +433,7 @@ function FileTreePanel({
             selectedPath={selectedPath}
             onSelectFile={onSelectFile}
             commentCounts={commentCounts}
+            cols={cols}
           />
         )}
       </div>
@@ -354,6 +447,7 @@ interface FolderContentsProps {
   selectedPath: string;
   onSelectFile: (path: string) => void;
   commentCounts: Map<string, number>;
+  cols: TreeColumns;
 }
 
 function FolderContents({
@@ -362,6 +456,7 @@ function FolderContents({
   selectedPath,
   onSelectFile,
   commentCounts,
+  cols,
 }: FolderContentsProps) {
   const childFolders = Array.from(node.children.values()).sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -377,6 +472,7 @@ function FolderContents({
           selectedPath={selectedPath}
           onSelectFile={onSelectFile}
           commentCounts={commentCounts}
+          cols={cols}
         />
       ))}
       {childFiles.map((file) => (
@@ -387,6 +483,7 @@ function FolderContents({
           selected={file.fullPath === selectedPath}
           commentCount={commentCounts.get(file.fullPath) ?? 0}
           onClick={() => onSelectFile(file.fullPath)}
+          cols={cols}
         />
       ))}
     </>
@@ -405,12 +502,14 @@ function FolderEntry({
   selectedPath,
   onSelectFile,
   commentCounts,
+  cols,
 }: {
   folder: TreeFolder;
   indent: number;
   selectedPath: string;
   onSelectFile: (path: string) => void;
   commentCounts: Map<string, number>;
+  cols: TreeColumns;
 }) {
   // Default-open if the folder has changes OR it contains the file the editor
   // opened to — so that file is never hidden in a collapsed folder. The user's
@@ -432,10 +531,9 @@ function FolderEntry({
   const tint = folder.dominantStatus ? FOLDER_TINT[folder.dominantStatus] : 'text-fg-fade-90';
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full group flex items-center gap-1 py-0.5 rounded-md text-[12px] hover:bg-[hsl(var(--surface-2)/0.6)] transition-colors"
+      <TreeRow
+        onActivate={() => setOpen((v) => !v)}
+        className="hover:bg-[hsl(var(--surface-2)/0.6)]"
         style={{ paddingLeft: 4 + indent * INDENT_STEP, paddingRight: 8 }}
       >
         <span
@@ -452,17 +550,23 @@ function FolderEntry({
           {folder.name}
           <span className="text-muted-fade-40">/</span>
         </span>
-        {folder.changedCount > 0 && (
-          <span
-            className={`shrink-0 font-mono text-[10px] font-semibold tabular-nums ${
-              folder.dominantStatus ? STATUS_TEXT[folder.dominantStatus] : 'text-muted-fade-70'
-            }`}
-            aria-label={`${folder.changedCount} changed`}
-          >
-            {folder.changedCount}
-          </span>
-        )}
-      </button>
+        <HoverSwapSlot
+          rest={
+            cols.status > 0 && (
+              <span
+                className={`font-mono text-[10px] font-semibold tabular-nums text-center ${
+                  folder.dominantStatus ? STATUS_TEXT[folder.dominantStatus] : 'text-muted-fade-70'
+                }`}
+                style={{ width: `${cols.status}ch` }}
+                aria-label={folder.changedCount > 0 ? `${folder.changedCount} changed` : undefined}
+              >
+                {folder.changedCount > 0 ? folder.changedCount : ''}
+              </span>
+            )
+          }
+          actions={<CopyPathAction path={folder.fullPath} />}
+        />
+      </TreeRow>
       {open && (
         <FolderContents
           node={folder}
@@ -470,6 +574,7 @@ function FolderEntry({
           selectedPath={selectedPath}
           onSelectFile={onSelectFile}
           commentCounts={commentCounts}
+          cols={cols}
         />
       )}
     </>
@@ -496,24 +601,23 @@ function FileEntry({
   selected,
   commentCount,
   onClick,
+  cols,
 }: {
   file: TreeFile;
   indent: number;
   selected: boolean;
   commentCount: number;
   onClick: () => void;
+  cols: TreeColumns;
 }) {
   const change = file.change;
   const tint = selected ? 'text-primary' : change ? STATUS_TEXT[change.status] : 'text-fg-fade-80';
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <TreeRow
+      onActivate={onClick}
       title={file.fullPath}
       style={{ paddingLeft: 4 + indent * INDENT_STEP, paddingRight: 8 }}
-      className={`w-full group flex items-center gap-1 py-0.5 rounded-md text-[12px] transition-colors ${
-        selected ? 'bg-primary/15' : 'hover:bg-[hsl(var(--surface-2)/0.6)]'
-      }`}
+      className={selected ? 'bg-primary/15' : 'hover:bg-[hsl(var(--surface-2)/0.6)]'}
     >
       {/* Empty icon slot keeps file names aligned with folder names at the
           same indent (the chevron column for folders). */}
@@ -521,35 +625,51 @@ function FileEntry({
       <span className={`flex-1 min-w-0 font-mono text-[11.5px] truncate text-left ${tint}`}>
         {file.name}
       </span>
-      {commentCount > 0 && <CommentBadge count={commentCount} />}
-      {change && (change.additions > 0 || change.deletions > 0) && (
-        <span className="font-mono text-[10.5px] flex gap-1.5 shrink-0">
-          {change.additions > 0 && (
-            <span
-              className={
-                change.status === 'untracked'
-                  ? 'text-muted-foreground'
-                  : 'text-[hsl(var(--git-added))]'
-              }
-            >
-              +{change.additions}
-            </span>
-          )}
-          {change.deletions > 0 && (
-            <span className="text-[hsl(var(--git-deleted))]">−{change.deletions}</span>
-          )}
-        </span>
-      )}
-      {change && (
-        <span
-          className={`font-mono text-[10px] font-semibold w-3 text-center shrink-0 ${
-            selected ? 'text-primary' : STATUS_TEXT[change.status]
-          }`}
-        >
-          {STATUS_LABEL[change.status]}
-        </span>
-      )}
-    </button>
+      {/* Stat columns at rest (each as wide as the tree's widest value, so
+          they line up down the list); "Copy path" slides in on hover. */}
+      <HoverSwapSlot
+        rest={
+          <span className="flex items-center gap-1.5 font-mono text-[10.5px] tabular-nums">
+            {cols.comments && (
+              <span className="flex w-[18px] justify-end">
+                {commentCount > 0 && <CommentBadge count={commentCount} />}
+              </span>
+            )}
+            {cols.add > 0 && (
+              <span
+                className={`text-right ${
+                  change?.status === 'untracked'
+                    ? 'text-muted-foreground'
+                    : 'text-[hsl(var(--git-added))]'
+                }`}
+                style={{ width: `${cols.add}ch` }}
+              >
+                {change && change.additions > 0 ? `+${change.additions}` : ''}
+              </span>
+            )}
+            {cols.del > 0 && (
+              <span
+                className="text-right text-[hsl(var(--git-deleted))]"
+                style={{ width: `${cols.del}ch` }}
+              >
+                {change && change.deletions > 0 ? `−${change.deletions}` : ''}
+              </span>
+            )}
+            {cols.status > 0 && (
+              <span
+                className={`text-[10px] font-semibold text-center ${
+                  change ? (selected ? 'text-primary' : STATUS_TEXT[change.status]) : ''
+                }`}
+                style={{ width: `${cols.status}ch` }}
+              >
+                {change ? STATUS_LABEL[change.status] : ''}
+              </span>
+            )}
+          </span>
+        }
+        actions={<CopyPathAction path={file.fullPath} />}
+      />
+    </TreeRow>
   );
 }
 

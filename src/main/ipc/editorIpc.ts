@@ -99,6 +99,7 @@ export function detectLanguage(filePath: string): string {
     scss: 'scss',
     html: 'html',
     json: 'json',
+    jsonc: 'json',
     yaml: 'yaml',
     yml: 'yaml',
     md: 'markdown',

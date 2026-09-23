@@ -1,4 +1,4 @@
-// Register Monaco's base editor worker only, and point @monaco-editor/react's
+// Register Monaco's base editor worker (plus JSON's, below), and point @monaco-editor/react's
 // loader at the locally-bundled ESM build so it never reaches for the CDN
 // (which would break in offline packaged Electron apps).
 //
@@ -7,8 +7,9 @@
 // language-service contribution modules (ts/css/html/json). Each of those
 // imports its own `.worker?worker`, which Vite then bundles — ts.worker
 // alone is ~7 MB because it embeds the TypeScript compiler. We deliberately
-// avoid the language services here: this view is for reading, commenting,
-// and minor edits, not IntelliSense.
+// avoid the heavy language services here: this view is for reading,
+// commenting, and minor edits, not IntelliSense. JSON is the exception: it
+// has no Monarch grammar, and its service is small.
 //
 // Syntax highlighting (Monarch grammars) runs on the main thread and is
 // pulled in per-language via the `basic-languages/*/*.contribution` imports
@@ -49,15 +50,27 @@ import 'monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution';
 import 'monaco-editor/esm/vs/basic-languages/php/php.contribution';
 import 'monaco-editor/esm/vs/basic-languages/lua/lua.contribution';
 
+// JSON has no Monarch grammar: Monaco's JSON language service provides its
+// highlighting, folding and validation, backed by a small worker of its own
+// (unlike ts.worker, it doesn't embed a compiler). Config files like tsconfig
+// carry comments and trailing commas, so neither is flagged.
+import { jsonDefaults } from 'monaco-editor/esm/vs/language/json/monaco.contribution';
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+jsonDefaults.setDiagnosticsOptions({
+  ...jsonDefaults.diagnosticsOptions,
+  comments: 'ignore',
+  trailingCommas: 'ignore',
+});
+
 const w = self as unknown as {
-  MonacoEnvironment?: { getWorker: () => Worker };
+  MonacoEnvironment?: { getWorker: (workerId: string, label: string) => Worker };
   __dashMonacoWorkerInstalled?: boolean;
 };
 
 if (!w.__dashMonacoWorkerInstalled) {
   w.MonacoEnvironment = {
-    getWorker() {
-      return new editorWorker();
+    getWorker(_workerId, label) {
+      return label === 'json' ? new jsonWorker() : new editorWorker();
     },
   };
   loader.config({ monaco: monaco as unknown as Parameters<typeof loader.config>[0]['monaco'] });

@@ -24,6 +24,7 @@ import { useEditorSave } from './editor/useEditorSave';
 import { useMonacoEditor } from './editor/useMonacoEditor';
 import { EditorHeader } from './editor/EditorHeader';
 import { EditorViewport } from './editor/EditorViewport';
+import { EditorContextMenu } from './editor/EditorContextMenu';
 import { HtmlPreview } from './editor/HtmlPreview';
 import { markdownToDocument } from './editor/markdownPreview';
 import { LoadingPill } from './editor/LoadingPill';
@@ -33,6 +34,7 @@ import '../../monaco-workers';
 
 const WORDWRAP_KEY = 'diffEditor.wordWrap';
 const BLAME_KEY = 'diffEditor.blame';
+const SIDE_BY_SIDE_KEY = 'diffEditor.sideBySide';
 
 /** Which files get a Code | Preview toggle, and how their preview is rendered.
  *  HTML renders as-is; markdown is converted to a styled HTML document. */
@@ -91,6 +93,9 @@ export function EditorPane({
   // Inline git blame defaults ON; only an explicit 'off' disables it.
   const [blameEnabled, setBlameEnabled] = useState<boolean>(
     () => localStorage.getItem(BLAME_KEY) !== 'off',
+  );
+  const [sideBySide, setSideBySide] = useState<boolean>(
+    () => localStorage.getItem(SIDE_BY_SIDE_KEY) === 'on',
   );
   const [previewing, setPreviewing] = useState(false);
   const kind = previewKind(filePath);
@@ -271,6 +276,10 @@ export function EditorPane({
     localStorage.setItem(BLAME_KEY, blameEnabled ? 'on' : 'off');
   }, [blameEnabled]);
 
+  useEffect(() => {
+    localStorage.setItem(SIDE_BY_SIDE_KEY, sideBySide ? 'on' : 'off');
+  }, [sideBySide]);
+
   // Bridge useEditorSave → useMonacoEditor's ⌘S binding. The hook fires
   // saveCmdRef.current() from the keybinding; we keep this ref pointed at
   // the latest save callback so it never goes stale on re-render.
@@ -385,6 +394,8 @@ export function EditorPane({
         view={view}
         wordWrap={wordWrap}
         onToggleWordWrap={() => setWordWrap((w) => !w)}
+        sideBySide={sideBySide}
+        onToggleSideBySide={() => setSideBySide((v) => !v)}
         blameEnabled={blameEnabled}
         onToggleBlame={() => setBlameEnabled((b) => !b)}
         canPreview={canPreview}
@@ -414,143 +425,146 @@ export function EditorPane({
         />
       )}
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <EditorViewport
-          displayed={displayed}
-          currentState={state}
-          isCommitView={isCommitView}
-          draft={draft}
-          editable={editable}
-          themeName={themeName}
-          wordWrap={wordWrap}
-          beforeMount={handleBeforeMount}
-          onMount={handleMount}
-          areaRef={setEditorAreaEl}
-          fileFadeNonce={fileFadeNonce}
-        >
-          {editable && (dirty || saving || savedPill) && (
-            <button
-              onClick={() => void save()}
-              disabled={!dirty || saving}
-              className={`absolute bottom-16 right-4 z-10 px-3 py-1.5 rounded-md text-[11px] font-medium bg-primary/70 text-primary-foreground hover:bg-primary/85 disabled:cursor-default backdrop-blur-xs shadow-lg shadow-shade/30 transition-opacity ${savedPill ? 'animate-save-flash' : ''}`}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          )}
-          {showCommentsMenu && (
-            <div className="absolute bottom-4 right-4 z-10">
-              <CommentsMenu
-                commentsByFile={commentsByFile}
-                currentFilePath={filePath}
-                currentScope={scope}
-                getLiveRangeForCurrent={(commentId) => {
-                  const target = liveComments.find((c) => c.id === commentId);
-                  if (!target) return null;
-                  const model = modifiedEditor?.getModel();
-                  const r = model?.getDecorationRange(target.decorationId);
-                  return r ? { start: r.startLineNumber, end: r.endLineNumber } : null;
-                }}
-                onNavigate={onNavigateToComment}
-                onRemove={(_path, id) => useCommentsStore.getState().remove(id)}
-                onUnsend={(id) => useCommentsStore.getState().markUnsent(id)}
-                onClearSent={(scope) => useCommentsStore.getState().clearSent(scope)}
-                onSendScope={promptApi.sendScope}
-                onSendAll={promptApi.sendAllUnsent}
-                onEditAndSend={promptApi.openEditAndSend}
-                onSendOne={promptApi.sendOne}
-              />
-            </div>
-          )}
-          {state.kind === 'loading' && displayed.kind === 'loaded' && <LoadingPill />}
-          {rulerMark &&
-            (() => {
-              const lineRange =
-                rulerMark.lineStart === rulerMark.lineEnd
-                  ? `L${rulerMark.lineStart}`
-                  : `L${rulerMark.lineStart}–${rulerMark.lineEnd}`;
-              const band = (
-                <div
-                  className="monaco-blame-ruler-band"
-                  data-visible={rulerVisible}
-                  data-slide={rulerSlide}
-                  style={{ top: rulerMark.top, height: rulerMark.height }}
+      <EditorContextMenu cwd={cwd} filePath={filePath} editor={editor}>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <EditorViewport
+            displayed={displayed}
+            currentState={state}
+            isCommitView={isCommitView}
+            draft={draft}
+            editable={editable}
+            themeName={themeName}
+            wordWrap={wordWrap}
+            sideBySide={sideBySide}
+            beforeMount={handleBeforeMount}
+            onMount={handleMount}
+            areaRef={setEditorAreaEl}
+            fileFadeNonce={fileFadeNonce}
+          >
+            {editable && (dirty || saving || savedPill) && (
+              <button
+                onClick={() => void save()}
+                disabled={!dirty || saving}
+                className={`absolute bottom-16 right-4 z-10 px-3 py-1.5 rounded-md text-[11px] font-medium bg-primary/70 text-primary-foreground hover:bg-primary/85 disabled:cursor-default backdrop-blur-xs shadow-lg shadow-shade/30 transition-opacity ${savedPill ? 'animate-save-flash' : ''}`}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
+            {showCommentsMenu && (
+              <div className="absolute bottom-4 right-4 z-10">
+                <CommentsMenu
+                  commentsByFile={commentsByFile}
+                  currentFilePath={filePath}
+                  currentScope={scope}
+                  getLiveRangeForCurrent={(commentId) => {
+                    const target = liveComments.find((c) => c.id === commentId);
+                    if (!target) return null;
+                    const model = modifiedEditor?.getModel();
+                    const r = model?.getDecorationRange(target.decorationId);
+                    return r ? { start: r.startLineNumber, end: r.endLineNumber } : null;
+                  }}
+                  onNavigate={onNavigateToComment}
+                  onRemove={(_path, id) => useCommentsStore.getState().remove(id)}
+                  onUnsend={(id) => useCommentsStore.getState().markUnsent(id)}
+                  onClearSent={(scope) => useCommentsStore.getState().clearSent(scope)}
+                  onSendScope={promptApi.sendScope}
+                  onSendAll={promptApi.sendAllUnsent}
+                  onEditAndSend={promptApi.openEditAndSend}
+                  onSendOne={promptApi.sendOne}
                 />
-              );
-              return (
-                <>
-                  {rulerHost ? createPortal(band, rulerHost) : band}
+              </div>
+            )}
+            {state.kind === 'loading' && displayed.kind === 'loaded' && <LoadingPill />}
+            {rulerMark &&
+              (() => {
+                const lineRange =
+                  rulerMark.lineStart === rulerMark.lineEnd
+                    ? `L${rulerMark.lineStart}`
+                    : `L${rulerMark.lineStart}–${rulerMark.lineEnd}`;
+                const band = (
                   <div
-                    ref={blameLabelRef}
-                    className="monaco-blame-ruler-label"
+                    className="monaco-blame-ruler-band"
                     data-visible={rulerVisible}
                     data-slide={rulerSlide}
-                    style={{ top: rulerMark.top }}
-                    onMouseEnter={holdLabel}
-                    onMouseLeave={releaseLabel}
-                  >
-                    <button
-                      type="button"
-                      className="blame-label-close"
-                      title="Hide git blame"
-                      onClick={() => setBlameEnabled(false)}
+                    style={{ top: rulerMark.top, height: rulerMark.height }}
+                  />
+                );
+                return (
+                  <>
+                    {rulerHost ? createPortal(band, rulerHost) : band}
+                    <div
+                      ref={blameLabelRef}
+                      className="monaco-blame-ruler-label"
+                      data-visible={rulerVisible}
+                      data-slide={rulerSlide}
+                      style={{ top: rulerMark.top }}
+                      onMouseEnter={holdLabel}
+                      onMouseLeave={releaseLabel}
                     >
-                      <X size={11} strokeWidth={2} />
-                    </button>
-                    <span className="blame-label-author">{rulerMark.label.author}</span>
-                    <span className="blame-label-meta">
-                      {!rulerMark.label.uncommitted && (
-                        <>
-                          <button
-                            type="button"
-                            className="blame-label-sha"
-                            title="Open this commit in the graph"
-                            onClick={() =>
-                              useGit.getState().openCommitGraphAtCommit(rulerMark.label.shortSha)
-                            }
-                          >
-                            {rulerMark.label.shortSha}
-                          </button>
-                          {rulerMark.label.age && (
-                            <span className="blame-label-age">{rulerMark.label.age} ago</span>
-                          )}
-                        </>
+                      <button
+                        type="button"
+                        className="blame-label-close"
+                        title="Hide git blame"
+                        onClick={() => setBlameEnabled(false)}
+                      >
+                        <X size={11} strokeWidth={2} />
+                      </button>
+                      <span className="blame-label-author">{rulerMark.label.author}</span>
+                      <span className="blame-label-meta">
+                        {!rulerMark.label.uncommitted && (
+                          <>
+                            <button
+                              type="button"
+                              className="blame-label-sha"
+                              title="Open this commit in the graph"
+                              onClick={() =>
+                                useGit.getState().openCommitGraphAtCommit(rulerMark.label.shortSha)
+                              }
+                            >
+                              {rulerMark.label.shortSha}
+                            </button>
+                            {rulerMark.label.age && (
+                              <span className="blame-label-age">{rulerMark.label.age} ago</span>
+                            )}
+                          </>
+                        )}
+                        <span className="blame-label-lines">{lineRange}</span>
+                      </span>
+                      {!rulerMark.label.uncommitted && rulerMark.label.summary && (
+                        <span className="blame-label-summary">{rulerMark.label.summary}</span>
                       )}
-                      <span className="blame-label-lines">{lineRange}</span>
-                    </span>
-                    {!rulerMark.label.uncommitted && rulerMark.label.summary && (
-                      <span className="blame-label-summary">{rulerMark.label.summary}</span>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          <CommentOverlay
-            liveComments={liveComments}
-            shadeById={shadeById}
-            scopeLabel={bubbleScopeLabel}
-            modifiedEditor={modifiedEditor}
-            monaco={monaco}
-            area={editorAreaEl}
-            hoveredId={hoveredCommentId}
-            onHoveredIdChange={setHoveredCommentId}
-            onEditComment={draftApi.beginEdit}
-            onDeleteComment={binding.remove}
-            onReopenComment={(id) => useCommentsStore.getState().markUnsent(id)}
-            pendingRange={dragging ? null : pendingRange}
-            pendingText={draftApi.pendingText}
-            editingId={draftApi.editingId}
-            onSubmitDraft={(text) => draftApi.submit(text, dragging ? null : pendingRange)}
-            onCancelDraft={draftApi.cancel}
-          />
-        </EditorViewport>
-        {/* Rendered preview overlays the editor (kept mounted underneath so
+                    </div>
+                  </>
+                );
+              })()}
+            <CommentOverlay
+              liveComments={liveComments}
+              shadeById={shadeById}
+              scopeLabel={bubbleScopeLabel}
+              modifiedEditor={modifiedEditor}
+              monaco={monaco}
+              area={editorAreaEl}
+              hoveredId={hoveredCommentId}
+              onHoveredIdChange={setHoveredCommentId}
+              onEditComment={draftApi.beginEdit}
+              onDeleteComment={binding.remove}
+              onReopenComment={(id) => useCommentsStore.getState().markUnsent(id)}
+              pendingRange={dragging ? null : pendingRange}
+              pendingText={draftApi.pendingText}
+              editingId={draftApi.editingId}
+              onSubmitDraft={(text) => draftApi.submit(text, dragging ? null : pendingRange)}
+              onCancelDraft={draftApi.cancel}
+            />
+          </EditorViewport>
+          {/* Rendered preview overlays the editor (kept mounted underneath so
             toggling back to Code preserves scroll, cursor, and comment state). */}
-        {canPreview && previewing && (
-          <div className="absolute inset-0 z-30">
-            <HtmlPreview html={previewHtml} />
-          </div>
-        )}
-      </div>
+          {canPreview && previewing && (
+            <div className="absolute inset-0 z-30">
+              <HtmlPreview html={previewHtml} />
+            </div>
+          )}
+        </div>
+      </EditorContextMenu>
       {promptApi.editTarget && (
         <EditCommentsModal
           initialText={promptApi.editTarget.text}

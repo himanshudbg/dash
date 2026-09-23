@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Eye, GitCommit, GitCompare, History, MessageSquare, WrapText, X } from 'lucide-react';
+import {
+  Check,
+  Columns2,
+  Copy,
+  Eye,
+  GitCommit,
+  GitCompare,
+  History,
+  MessageSquare,
+  WrapText,
+  X,
+} from 'lucide-react';
 import type { EditorView } from '../types';
 import { Popover, PopoverAnchor, PopoverContent } from '../../ui/Popover';
 import { Tooltip } from '../../ui/Tooltip';
@@ -11,6 +22,9 @@ interface Props {
   view: EditorView;
   wordWrap: boolean;
   onToggleWordWrap(): void;
+  /** Side-by-side (two columns) instead of the inline diff. Persisted. */
+  sideBySide: boolean;
+  onToggleSideBySide(): void;
   /** Inline git-blame toggle (default on, persisted). */
   blameEnabled: boolean;
   onToggleBlame(): void;
@@ -39,6 +53,8 @@ export function EditorHeader({
   view,
   wordWrap,
   onToggleWordWrap,
+  sideBySide,
+  onToggleSideBySide,
   blameEnabled,
   onToggleBlame,
   canPreview,
@@ -69,6 +85,18 @@ export function EditorHeader({
           }
         : null;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  function copyPath() {
+    void window.electronAPI.clipboardWriteText(filePath);
+    setCopied(true);
+  }
 
   // Close the picker when the host switches view (e.g. user clicks a commit
   // row), so a stale popover doesn't linger anchored to the chip.
@@ -135,7 +163,20 @@ export function EditorHeader({
             </span>
           </Tooltip>
         )}
-        <span className="text-[13px] font-medium text-foreground truncate">{filePath}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          <span className="text-[13px] font-medium text-foreground truncate">{filePath}</span>
+          <Tooltip content={copied ? 'Copied' : 'Copy path'}>
+            <button
+              type="button"
+              onClick={copyPath}
+              className={`shrink-0 p-1 rounded-md transition-colors hover:bg-accent/60 ${
+                copied ? 'text-[hsl(var(--git-added))]' : 'text-muted-fade-60 hover:text-foreground'
+              }`}
+            >
+              {copied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.8} />}
+            </button>
+          </Tooltip>
+        </span>
       </div>
       <div className="flex items-center gap-1">
         {canPreview && (
@@ -182,6 +223,11 @@ export function EditorHeader({
         <Tooltip content={blameEnabled ? 'Hide git blame' : 'Show git blame'}>
           <button onClick={onToggleBlame} className={iconBtn(blameEnabled)}>
             <History size={14} strokeWidth={1.8} />
+          </button>
+        </Tooltip>
+        <Tooltip content={sideBySide ? 'Show inline diff' : 'Show side by side'}>
+          <button onClick={onToggleSideBySide} className={iconBtn(sideBySide)}>
+            <Columns2 size={14} strokeWidth={1.8} />
           </button>
         </Tooltip>
         <Tooltip content={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}>

@@ -12,6 +12,8 @@ interface Props {
   editable: boolean;
   themeName: string;
   wordWrap: boolean;
+  /** Two columns (base | working) instead of the inline diff. */
+  sideBySide: boolean;
   beforeMount(monaco: typeof import('monaco-editor')): void;
   onMount(editor: monacoEditor.IStandaloneDiffEditor, monaco: typeof import('monaco-editor')): void;
   /** Caller passes a ref-callback so it can render comment widgets and the
@@ -34,6 +36,7 @@ export function EditorViewport({
   editable,
   themeName,
   wordWrap,
+  sideBySide,
   beforeMount,
   onMount,
   areaRef,
@@ -105,8 +108,11 @@ export function EditorViewport({
             options={{
               originalEditable: false,
               readOnly: !editable,
-              renderSideBySide: false,
-              compactMode: true,
+              renderSideBySide: sideBySide,
+              // Monaco falls back to inline below this width; the modal is
+              // wide enough that side by side should hold on any normal window.
+              renderSideBySideInlineBreakpoint: 600,
+              compactMode: !sideBySide,
               renderGutterMenu: false,
               contextmenu: false,
               minimap: {

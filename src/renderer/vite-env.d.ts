@@ -27,3 +27,9 @@ declare module 'monaco-editor/esm/vs/editor/browser/widget/diffEditor/features/o
 // Monaco's deep language-contribution modules ship no type declarations.
 // TypeScript 6's stricter side-effect-import check (TS2882) needs them declared.
 declare module 'monaco-editor/esm/vs/basic-languages/*';
+
+// The JSON language service (see monaco-workers.ts) — typed from the public
+// `monaco.json` namespace, which is the same object.
+declare module 'monaco-editor/esm/vs/language/json/monaco.contribution' {
+  export const jsonDefaults: import('monaco-editor').json.LanguageServiceDefaults;
+}
