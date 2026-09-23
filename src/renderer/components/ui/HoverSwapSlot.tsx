@@ -26,14 +26,22 @@ export function HoverSwapSlot({ rest, actions, revealed = false }: HoverSwapSlot
       >
         {rest}
       </div>
+      {/* The clip box sits at the row's right edge; the actions slide their
+          full width in from behind it, like a drawer. */}
       <div
-        className={`absolute inset-y-0 right-0 flex items-center gap-0.5 transition-[opacity,transform] duration-200 ease-out ${
-          revealed
-            ? 'opacity-100 translate-x-0'
-            : 'opacity-0 translate-x-2 pointer-events-none group-hover/swap:opacity-100 group-hover/swap:translate-x-0 group-hover/swap:pointer-events-auto'
+        className={`absolute inset-y-0 right-0 flex items-center overflow-hidden ${
+          revealed ? '' : 'pointer-events-none group-hover/swap:pointer-events-auto'
         }`}
       >
-        {actions}
+        <div
+          className={`flex items-center gap-0.5 transition-[opacity,translate] duration-200 ease-out ${
+            revealed
+              ? 'opacity-100 translate-x-0'
+              : 'opacity-0 translate-x-full group-hover/swap:opacity-100 group-hover/swap:translate-x-0'
+          }`}
+        >
+          {actions}
+        </div>
       </div>
     </div>
   );

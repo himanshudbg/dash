@@ -168,7 +168,7 @@ export function TaskCard({
             </div>
           </div>
           <div
-            className={`grid transition-[grid-template-columns,opacity,transform] duration-200 ease-out ${revealCls}`}
+            className={`grid transition-[grid-template-columns,opacity,translate] duration-200 ease-out ${revealCls}`}
           >
             <div className="overflow-hidden min-w-0">
               <TaskActions
