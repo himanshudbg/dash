@@ -44,6 +44,7 @@ interface Props {
 }
 
 const DEFAULT_BUBBLE_FRACTION = 0.4;
+const MIN_BUBBLE_PX = 320;
 const ICON_HEIGHT_PX = 16;
 
 /** Renders one bubble-stack + one icon per anchor group. Groups are formed
@@ -137,13 +138,25 @@ export function CommentOverlay({
   const scrollTop = modifiedEditor.getScrollTop();
   const lineHeight = modifiedEditor.getOption(monaco.editor.EditorOption.lineHeight) as number;
 
-  const iconLeft = layout.decorationsLeft + 4;
+  // The overlay is drawn in the diff area, but layout offsets are relative to
+  // the modified editor. Inline they coincide; side by side the modified
+  // editor starts after the original column, so shift everything by its x.
+  // Re-read on every render, which useViewzones triggers on layout changes.
+  const editorX =
+    (modifiedEditor.getDomNode()?.getBoundingClientRect().left ?? 0) -
+    area.getBoundingClientRect().left;
+  const iconLeft = editorX + layout.decorationsLeft + 4;
   const contentLeft = layout.contentLeft;
   // Bubble starts at the very left edge of the gutter (lineNumbersLeft is
   // 0 when there's no glyphMargin, which is our case). Width stays at the
   // configured fraction of the content area.
-  const bubbleLeft = layout.lineNumbersLeft;
-  const bubbleWidth = Math.round(layout.contentWidth * bubbleWidthFraction);
+  const bubbleLeft = editorX + layout.lineNumbersLeft;
+  // Side by side halves contentWidth, so the fraction alone gets cramped: keep
+  // a readable floor, never wider than the editor column itself.
+  const bubbleWidth = Math.min(
+    Math.max(Math.round(layout.contentWidth * bubbleWidthFraction), MIN_BUBBLE_PX),
+    layout.width - layout.lineNumbersLeft - 16,
+  );
   // Tail tip should land at the first non-whitespace character of the
   // anchor line below — i.e. where the line's content actually starts
   // visually, not at indented whitespace. Computed per-anchor since
@@ -155,13 +168,15 @@ export function CommentOverlay({
     if (model) {
       const col = model.getLineFirstNonWhitespaceColumn(anchorLine);
       if (col > 0) {
+        // getOffsetForColumn is measured from the start of the line's text,
+        // not the editor's left edge, so it sits past the gutter.
         const offset = modifiedEditor.getOffsetForColumn(anchorLine, col);
-        if (offset > 0) tipX = offset;
+        if (offset > 0) tipX = contentLeft + offset;
       }
     }
     // Triangle is 14px wide; the tip is at its center, so subtract 7 from
     // the desired tip x to get the triangle's `left` within the bubble.
-    return tipX - bubbleLeft - 7;
+    return editorX + tipX - bubbleLeft - 7;
   };
 
   return (
