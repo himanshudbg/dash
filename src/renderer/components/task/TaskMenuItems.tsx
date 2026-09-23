@@ -1,5 +1,7 @@
-import { Code2, Settings, Archive, Trash2 } from 'lucide-react';
+import { Settings, Archive, Trash2 } from 'lucide-react';
 import { DropdownMenuItem, DropdownMenuSeparator } from '../ui/DropdownMenu';
+import { IdeIcon } from '../ui/IdeIcon';
+import { usePreferredIde } from '../../hooks/usePreferredIde';
 
 export interface TaskMenuHandlers {
   onOpenIde: () => void;
@@ -14,11 +16,14 @@ export interface TaskMenuHandlers {
  * its own extras around it.
  */
 export function TaskMenuItems({ onOpenIde, onSettings, onArchive, onDelete }: TaskMenuHandlers) {
+  const { ideId, openLabel } = usePreferredIde();
   return (
     <>
       <DropdownMenuItem onSelect={onOpenIde}>
-        <Code2 size={13} strokeWidth={1.8} className="text-muted-foreground" />
-        Open in IDE
+        <span className="inline-flex w-[13px] justify-center text-muted-foreground">
+          <IdeIcon ideId={ideId} />
+        </span>
+        {openLabel}
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={onSettings}>
         <Settings size={13} strokeWidth={1.8} className="text-muted-foreground" />

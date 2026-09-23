@@ -19,7 +19,8 @@ import type { Project, Task, LinkedItem } from '../../shared/types';
 import { branchUrl, linkedItemUrl } from '../../shared/urls';
 import { Tooltip } from './ui/Tooltip';
 import { IconButton } from './ui/IconButton';
-import { IdeIcon, resolveIdeId } from './ui/IdeIcon';
+import { IdeIcon } from './ui/IdeIcon';
+import { usePreferredIde } from '../hooks/usePreferredIde';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +29,6 @@ import {
   DropdownMenuTrigger,
 } from './ui/DropdownMenu';
 import { TaskMenuItems } from './task/TaskMenuItems';
-import { useProjects } from '../stores/projectsStore';
 import { TokenBadge } from './ui/TokenBadge';
 import { PrBadge } from './ui/PrBadge';
 
@@ -154,10 +154,7 @@ export function MainContent({
   const remoteControlStates = useRuntime((s) => s.remoteControlStates);
   const claudeCli = useRuntime((s) => s.claudeCli);
   const remoteControlState = activeTask ? (remoteControlStates[activeTask.id] ?? null) : null;
-  const preferredIDE = useSettings((s) => s.preferredIDE);
-  const availableIDEs = useProjects((s) => s.availableIDEs);
-  const ideId = resolveIdeId(preferredIDE, availableIDEs);
-  const ideLabel = availableIDEs.find((i) => i.id === ideId)?.label ?? null;
+  const { ideId, openLabel } = usePreferredIde();
   if (!activeProject) {
     return (
       <div className="h-full flex flex-col bg-background">
@@ -267,7 +264,7 @@ export function MainContent({
         )}
 
         {activeTask && (
-          <Tooltip content={ideLabel ? `Open in ${ideLabel}` : 'Open in IDE'}>
+          <Tooltip content={openLabel}>
             <button
               onClick={onOpenIde}
               className="w-6 h-6 rounded inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
