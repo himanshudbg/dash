@@ -29,7 +29,7 @@ export function HoverSwapSlot({ rest, actions, revealed = false }: HoverSwapSlot
       {/* The clip box sits at the row's right edge; the actions slide their
           full width in from behind it, like a drawer. */}
       <div
-        className={`absolute inset-y-0 right-0 flex items-center overflow-hidden ${
+        className={`absolute inset-y-0 right-0 flex items-center overflow-x-clip ${
           revealed ? '' : 'pointer-events-none group-hover/swap:pointer-events-auto'
         }`}
       >
